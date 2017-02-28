@@ -11,10 +11,8 @@ class ACO:
         ]
 
     def update(self):
-        changed = False
         for entity in self.entities:
-            changed |= entity.updatePos()
-        return changed
+            entity.updatePos()
 
     def getEntities(self):
         return self.entities
@@ -28,21 +26,17 @@ class Entity:
         self.i = i
         self.j = j
         self.orient = 0
-        self.moveChance = 0
 
     def updatePos(self):
         i, j = self.i, self.j
         tiles = self.map.getTiles()
         width, height = self.map.getSize()
         if self.type == 'random-rabbit':
-            if random.random() > 1 - self.moveChance:
-                open_tiles = [(a, b, o) for (a, b, o) in
-                              [(i + 1, j, 270), (i - 1, j, 90), (i, j + 1, 0), (i, j - 1, 180)] if
-                              0 < a < width - 1 and 0 < b < height - 1 and tiles[a][b] == 0]
-                if open_tiles:  # if there are open tiles
-                    self.i, self.j, self.orient = random.choice(open_tiles)  # pick new position randomly
-                    self.moveChance = 0
-                    return True  # changed
-            else:
-                self.moveChance += 0.001
-        return False  # not changed
+            adjacent_tiles = [(i + 1, j, 90), (i - 1, j, 270), (i, j + 1, 180), (i, j - 1, 0)]
+            open_tiles = [(a, b, o) for (a, b, o) in adjacent_tiles if
+                          0 < a < width - 1 and 0 < b < height - 1 and tiles[a][b] == 0]
+            if len(open_tiles) > 1:  # go forward, left or right
+                self.i, self.j, self.orient = random.choice(
+                    [(a, b, o) for (a, b, o) in open_tiles if abs(o - self.orient) != 180])  # not back
+            else:  # go back
+                self.i, self.j, self.orient = open_tiles[0]  # only choice is back
