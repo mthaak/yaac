@@ -1,0 +1,14 @@
+#
+## Alias OBJ Material File
+# Exported from SketchUp, (c) 2000-2012 Trimble Navigation Limited
+
+newmtl Dirt
+Ka 0.000000 0.000000 0.000000
+Kd 0.117647 0.066667 0.035294
+Ks 0.330000 0.330000 0.330000
+
+newmtl Leafs
+Ka 0.000000 0.000000 0.000000
+Kd 0.270588 0.407843 0.400000
+Ks 0.330000 0.330000 0.330000
+
