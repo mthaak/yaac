@@ -72,6 +72,7 @@ class GUI:
             changed = self.alg.update()
             entities = self.alg.getEntities()
 
+
             # Render
             self.renderer.renderMap(self.map, select=self.select)
             self.renderer.renderEntities(entities)
