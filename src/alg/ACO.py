@@ -69,7 +69,13 @@ class ACO:
     def getEntities(self):
         return self.entities
 
-    def update_edges(self):
+    def evaporate(self):
+        rho = 0.1 #evaporation rate
+
+        for edge in self.edges:
+            self.edges[edge][1] = (1-rho)*self.edges[edge][1]
+            if self.edges[edge][1]<1:
+                self.edges[edge][1] = 1
         return
 
 
@@ -82,11 +88,12 @@ class Entity:
         self.i = i
         self.j = j
         self.orient = 0
-        self.moveChance = 0
         self.edges = edges
         self.alpha = 2 #This can be anything, and might be variable
         self.beta = 2 #This can be anyting, and might be variable
         self.found_food = found_food
+        self.step_count = 0
+        self.way_back = []
 
     def getEdges(self, i, j, edges):
         returned_edges = {}
@@ -178,6 +185,7 @@ class Entity:
 
                 path = self.weighted_choice(p.items())
                 reversed_path = self.reversed_path(path)
+                self.way_back.append(reversed_path) #path is appended so it forms the way back (in reversed order)
                 print("path =%s" % str(path))
                 #path = numpy.random.choice(list_of_candidates, 1, list_of_probabilities) Doesn't work because a should be 1-dimensional
                 self.i, self.j, self.orient = path[2], path[3], path[4]  # pick new position randomly

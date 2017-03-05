@@ -70,6 +70,7 @@ class GUI:
 
             # Update alg
             changed = self.alg.update()
+            evaporate = self.alg.evaporate()
             entities = self.alg.getEntities()
 
 
