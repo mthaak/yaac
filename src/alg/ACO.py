@@ -15,48 +15,61 @@ class ACO:
             if (i==0):
                 for j in range(0, height):
                     if (j == 0):
-                        self.edges[(i, j, i + 1, j, 270)] = [1, 1]
-                        self.edges[(i, j, i, j + 1, 0)] = [1, 1]
+                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
                     elif (j== (height-1)):
-                        self.edges[(i, j, i + 1, j, 270)] = [1, 1]
-                        self.edges[(i, j, i, j - 1, 180)] = [1, 1]
+                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+                        self.edges[(i, j, i, j - 1, 0)] = [1, 1]
                     else:
-                        self.edges[(i, j, i, j - 1, 180)] = [1, 1]
-                        self.edges[(i, j, i + 1, j, 270)] = [1, 1]
-                        self.edges[(i, j, i, j + 1, 0)] = [1, 1]
+                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
+                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
             elif ( i==(width -1)):
                 for j in range(0, height ):
                     if (j == 0):
-                        self.edges[(i, j, i, j + 1, 0)] = [1, 1]
-                        self.edges[(i, j, i - 1, j, 90)] = [1, 1]
+                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
+                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
                     elif(j==(height-1)):
-                        self.edges[(i, j, i, j - 1, 180)] = [1, 1]
-                        self.edges[(i, j, i - 1, j, 90)] = [1, 1]
+                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
+                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
                     else:
-                        self.edges[(i, j, i, j - 1, 180)] = [1, 1]
-                        self.edges[(i, j, i, j + 1, 0)] = [1, 1]
-                        self.edges[(i, j, i - 1, j, 90)] = [1, 1]
+                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
+                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
+                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
             else:
                 for j in range(0, height):
                     if (j == 0):
-                        self.edges[(i, j, i + 1, j, 270)] = [1, 1]
-                        self.edges[(i, j, i, j + 1, 0)] = [1, 1]
-                        self.edges[(i, j, i - 1, j, 90)] = [1, 1]
+                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
+                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
                     elif(j==(height-1)):
-                        self.edges[(i, j, i, j - 1, 180)] = [1, 1]
-                        self.edges[(i, j, i + 1, j, 270)] = [1, 1]
-                        self.edges[(i, j, i - 1, j, 90)] = [1, 1]
+                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
+                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
                     else: #base case
-                        self.edges[(i, j, i, j - 1, 180)] = [1, 1]
-                        self.edges[(i, j, i + 1, j, 270)] = [1, 1]
-                        self.edges[(i, j, i, j + 1, 0)] = [1, 1]
-                        self.edges[(i, j, i - 1, j, 90)] = [1, 1]
+                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
+                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
+                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
 
 
         self.entities = [
-            Entity(map, 0, 'random-rabbit', 2, 2, self.edges, 0),
-            Entity(map, 1, 'random-rabbit', 4, 5, self.edges, 0),
-            Entity(map, 2, 'random-rabbit', 9, 2, self.edges, 1)
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 1, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 3, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 4, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 5, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 1, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 3, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 4, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 5, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 1, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 3, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 4, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 5, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 6, 'random-rabbit', 1, 1, self.edges, 0)
         ]
 
     def update(self):
@@ -70,12 +83,13 @@ class ACO:
         return self.entities
 
     def evaporate(self):
-        rho = 0.1 #evaporation rate
+        rho = 0.02 #evaporation rate
 
         for edge in self.edges:
             self.edges[edge][1] = (1-rho)*self.edges[edge][1]
-            if self.edges[edge][1]<1:
-                self.edges[edge][1] = 1
+            if self.edges[edge][1]<0.1:
+                self.edges[edge][1] = 0.1
+
         return
 
 
@@ -91,28 +105,38 @@ class Entity:
         self.edges = edges
         self.alpha = 2 #This can be anything, and might be variable
         self.beta = 2 #This can be anyting, and might be variable
+        self.pherodrop = 5 #the amount of pheromones that is dropped when food is found
         self.found_food = found_food
         self.step_count = 0
+        self.way = []
         self.way_back = []
+        # self.startpos = self.map.getStartPos()
+        self.startpos = (i, j)
+        self.endpos = self.map.getEndPos()
+        self.prevpos = ()
 
-    def getEdges(self, i, j, edges):
+    def getEdges(self, i, j, edges, prevpos):
         returned_edges = {}
         try:
-            returned_edges[(i, j, i, j - 1, 180)] = edges[(i, j, i, j - 1, 180)]
+            if prevpos != (i, j-1):
+                returned_edges[(i, j, i, j - 1, 0)] = edges[(i, j, i, j - 1, 0)]
         except KeyError:
-            print('nice try')
+            print('nice edge down')
         try:
-            returned_edges[(i, j, i + 1, j, 270)] = edges[(i, j, i + 1, j, 270)]
+            if prevpos != (i +1, j ):
+                returned_edges[(i, j, i + 1, j, 90)] = edges[(i, j, i + 1, j, 90)]
         except KeyError:
-            print('nice try')
+            print('no edge right')
         try:
-            returned_edges[(i, j, i , j + 1, 0)] = edges[(i, j, i , j + 1, 0)]
+            if prevpos != (i, j +1):
+                returned_edges[(i, j, i , j + 1, 180)] = edges[(i, j, i , j + 1, 180)]
         except KeyError:
-            print('nice try')
+            print('no edge up')
         try:
-            returned_edges[(i, j, i - 1, j, 90)] = edges[(i, j, i - 1, j, 90)]
+            if prevpos != (i-1,j):
+                returned_edges[(i, j, i - 1, j, 270)] = edges[(i, j, i - 1, j, 270)]
         except KeyError:
-            print('nice try')
+            print('no edge left')
 
         #returned_edges[(0,1,0,1)] = edges[(0,1,0,1)] #replace with workable values
         return returned_edges
@@ -147,13 +171,13 @@ class Entity:
     def updatePos(self):
         i, j = self.i, self.j
         tiles = self.map.getTiles()
-        usableEedges = self.getEdges(i,j, self.edges)
+        usableEedges = self.getEdges(i,j, self.edges, self.prevpos)
         width, height = self.map.getSize()
 
         if self.type == 'random-rabbit':
             # if random.random() > 1 - self.moveChance:
             #     open_tiles = [(a, b, o) for (a, b, o) in
-            #                   [(i + 1, j, 270), (i - 1, j, 90), (i, j + 1, 0), (i, j - 1, 180)] if
+            #                   [(i + 1, j, 90), (i - 1, j, 270), (i, j + 1, 181), (i, j - 1, 0)] if
             #                   0 < a < width - 1 and 0 < b < height - 1 and tiles[a][b] == 0]
             #     if open_tiles:  # if there are open tiles
             #         self.i, self.j, self.orient = random.choice(open_tiles)  # pick new position randomly
@@ -161,7 +185,17 @@ class Entity:
             #         return True  # changed
             # else:
             #     self.moveChance += 0.001
-            if usableEedges:
+            if self.found_food ==1: # FOOD IS FOUND, GO BACK TO STARTING POINT WHILE DROPPING PHEROMONES
+                path = self.way_back.pop()
+                reversed_path = self.reversed_path(path)
+                self.i, self.j, self.orient = path[2], path[3], path[4]
+                self.edges[reversed_path][1]= self.edges[reversed_path][1] + self.pherodrop
+                newpos = (path[2], path[3])
+                if newpos == self.startpos:
+                    self.found_food = 0
+                return True
+
+            elif usableEedges:
                 k={}
                 p={}
                 sum_pheromones = 0
@@ -185,13 +219,17 @@ class Entity:
 
                 path = self.weighted_choice(p.items())
                 reversed_path = self.reversed_path(path)
-                self.way_back.append(reversed_path) #path is appended so it forms the way back (in reversed order)
+                self.way_back.append(reversed_path) #path is prepended so it forms the way back (in reversed order)
+                self.way.append(path)
                 print("path =%s" % str(path))
+                self.prevpos = (i,j)
                 #path = numpy.random.choice(list_of_candidates, 1, list_of_probabilities) Doesn't work because a should be 1-dimensional
                 self.i, self.j, self.orient = path[2], path[3], path[4]  # pick new position randomly
-                if (self.found_food ==1): #food found, pheromone should be dropped
-                    self.edges[path][1]= self.edges[path][1] +1
-                    self.edges[reversed_path][1] = self.edges[reversed_path][1] +1
+
+                newpos = (path[2], path[3])
+
+                if newpos == self.endpos:
+                    self.found_food = 1;
                 else:
                     return True
 

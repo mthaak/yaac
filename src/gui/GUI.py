@@ -99,7 +99,7 @@ class GUI:
         # Set up Pygame
         start_pygame()
         # pygame.init()
-        self.screen_width, self.screen_height = 1280, 1024
+        self.screen_width, self.screen_height = 1080, 720
         viewport = (self.screen_width, self.screen_height)
         hx = viewport[0] / 2
         hy = viewport[1] / 2
@@ -128,7 +128,7 @@ class GUI:
 
     def mainloop(self):
         while 1:
-            self.clock.tick(30)  # fix fps on 30 fps
+            self.clock.tick(300)  # fix fps on 30 fps
 
             for e in pygame.event.get():
                 if e.type == QUIT:
@@ -169,5 +169,6 @@ class GUI:
             # Only after move animation is done, the new entity positions are calculated
             if move_done:
                 self.alg.update()
+                self.alg.evaporate()
 
             pygame.display.flip()
