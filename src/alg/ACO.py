@@ -9,7 +9,6 @@ class ACO:
 
         self.edges = {}
         width, height = self.map.getSize()
-        self.edges[(0,1,0,1)] = [2,1]
 
         for i in range(0, (width)):
             if (i==0):
@@ -58,10 +57,6 @@ class ACO:
             Entity(map, 1, 'random-rabbit', 1, 1, self.edges, 0),
             Entity(map, 3, 'random-rabbit', 1, 1, self.edges, 0),
             Entity(map, 4, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 5, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 1, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 3, 'random-rabbit', 1, 1, self.edges, 0),
             Entity(map, 4, 'random-rabbit', 1, 1, self.edges, 0),
             Entity(map, 5, 'random-rabbit', 1, 1, self.edges, 0),
             Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
@@ -83,15 +78,39 @@ class ACO:
         return self.entities
 
     def evaporate(self):
-        rho = 0.02 #evaporation rate
+        rho = 0.05 #evaporation rate
 
         for edge in self.edges:
             self.edges[edge][1] = (1-rho)*self.edges[edge][1]
             if self.edges[edge][1]<0.1:
                 self.edges[edge][1] = 0.1
+            elif self.edges[edge][1] >5:
+                self.edges[edge][1] = 5
 
         return
 
+    def removeEdgesFromTile(self): #REMOVE THE TIES TO A WATER SQUARE
+        width, height = self.map.getSize()
+        for i in range(0, (width)):
+            for j in range(0, height):
+                if self.map.getTiles()[i][j] == 1:
+                    try:
+                        self.edges[(i, j, i, j - 1, 0)] = [0.1, 0.1]
+                    except KeyError:
+                        print('nice edge down')
+                    try:
+                        self.edges[(i, j, i + 1, j, 90)] = [0.1, 0.1]
+                    except KeyError:
+                        print('no edge right')
+                    try:
+                        self.edges[(i, j, i , j + 1, 180)] = [0.1, 0.1]
+                    except KeyError:
+                        print('no edge up')
+                    try:
+                        self.edges[(i, j, i - 1, j, 270)] = [0.1, 0.1]
+                    except KeyError:
+                        print('no edge left')
+        return
 
 
 class Entity:
@@ -104,8 +123,8 @@ class Entity:
         self.orient = 0
         self.edges = edges
         self.alpha = 2 #This can be anything, and might be variable
-        self.beta = 2 #This can be anyting, and might be variable
-        self.pherodrop = 5 #the amount of pheromones that is dropped when food is found
+        self.beta = 10 #This can be anyting, and might be variable
+        self.pherodrop = 1 #the amount of pheromones that is dropped when food is found
         self.found_food = found_food
         self.step_count = 0
         self.way = []

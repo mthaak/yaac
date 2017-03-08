@@ -71,7 +71,7 @@ class Renderer:
         os.chdir('../res/rabbit/anim_run')
         self.rabbit_models = []
         self.rabbit_anim_frame = 0
-        self.rabbit_anim_frames = 17
+        self.rabbit_anim_frames = 3
         self.rabbit_anim_counter = 0
         self.rabbit_anim_frame_length = 1
         for frame in range(self.rabbit_anim_frames):

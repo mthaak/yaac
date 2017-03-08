@@ -128,7 +128,7 @@ class GUI:
 
     def mainloop(self):
         while 1:
-            self.clock.tick(300)  # fix fps on 30 fps
+            self.clock.tick(3000)  # fix fps on 30 fps
 
             for e in pygame.event.get():
                 if e.type == QUIT:
@@ -170,5 +170,7 @@ class GUI:
             if move_done:
                 self.alg.update()
                 self.alg.evaporate()
+                self.alg.removeEdgesFromTile()
+
 
             pygame.display.flip()
