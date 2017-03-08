@@ -21,15 +21,17 @@ class ACO:
                 if i != 1:
                     self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
 
+        self.best_path = (width - 1) * (height - 1)
 
         self.entities = [
-            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0, self.best_path),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0, self.best_path),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0, self.best_path),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0, self.best_path),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0, self.best_path),
 
         ]
+        self.best_path = (width-1)*(height-1)
 
     def update(self):
 
@@ -98,7 +100,7 @@ class ACO:
 
 
 class Entity:
-    def __init__(self, map, index, type, i, j, edges, found_food):
+    def __init__(self, map, index, type, i, j, edges, found_food, best_path):
         self.map = map
         self.index = index
         self.type = 'random-rabbit'  # TODO create other possibilities
@@ -117,6 +119,7 @@ class Entity:
         self.startpos = (i, j)
         self.endpos = self.map.getEndPos()
         self.prevpos = ()
+        self.best_path = best_path
 
     def getEdges(self, i, j, edges, prevpos):
         returned_edges = {}
@@ -236,7 +239,10 @@ class Entity:
                 newpos = (path[2], path[3])
 
                 if newpos == self.endpos:
-                    self.found_food = 1;
+                    self.found_food = 1
+                    path_length = len(self.way_back)
+                    if path_length < self.best_path:
+                        self.best_path = path_length
                 else:
                     return True
 
