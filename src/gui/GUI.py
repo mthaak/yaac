@@ -167,15 +167,13 @@ class GUI:
 
             # Render
             edges = self.alg.edges if self.show_edges else {}
+            self.alg.removeEdgesFromTile()
             self.renderer.renderMap(select=self.select, show_grid=self.show_grid, edges=edges)
             move_done = self.renderer.renderEntities(self.alg.getEntities())
 
             # Only after move animation is done, the new entity positions are calculated
             if move_done:
-                self.alg.removeEdgesFromTile()
                 self.alg.update()
                 self.alg.evaporate()
-
-
 
             pygame.display.flip()

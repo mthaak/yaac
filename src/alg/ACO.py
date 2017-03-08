@@ -10,49 +10,23 @@ class ACO:
         self.edges = {}
         width, height = self.map.getSize()
 
-        for i in range(0, (width)):
-            if (i==0):
-                for j in range(0, height):
-                    if (j == 0):
-                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
-                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
-                    elif (j== (height-1)):
-                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
-                        self.edges[(i, j, i, j - 1, 0)] = [1, 1]
-                    else:
-                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
-                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
-                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
-            elif ( i==(width -1)):
-                for j in range(0, height ):
-                    if (j == 0):
-                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
-                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
-                    elif(j==(height-1)):
-                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
-                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
-                    else:
-                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
-                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
-                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
-            else:
-                for j in range(0, height):
-                    if (j == 0):
-                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
-                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
-                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
-                    elif(j==(height-1)):
-                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
-                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
-                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
-                    else: #base case
-                        self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
-                        self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
-                        self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
-                        self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
+        for i in range(1, (width - 1)):
+            for j in range(1, height - 1):
+                if j != 1:
+                    self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
+                if i != width - 2:
+                    self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+                if j != height - 2:
+                    self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
+                if i != 1:
+                    self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
 
 
         self.entities = [
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
+            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
             Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
 
         ]
@@ -79,6 +53,8 @@ class ACO:
 
         return
 
+
+
     def removeEdgesFromTile(self): #REMOVE THE TIES TO A WATER SQUARE
         removed_edges = []
         width, height = self.map.getSize()
@@ -86,23 +62,19 @@ class ACO:
             for j in range(0, height):
                 if self.map.getTiles()[i][j] == 1:
                     try: #4 times edges in
-                        removed_edges.append((i, j, i, j - 1, 0))
-                        del self.edges[(i, j, i, j - 1, 0)]
+                        del self.edges[(i, j-1, i, j, 180)]
                     except KeyError:
                         print('nice edge down')
                     try:
-                        removed_edges.append((i, j, i + 1, j, 90))
-                        del self.edges[(i, j, i + 1, j, 90)]
+                        del self.edges[(i+1, j, i , j, 270)]
                     except KeyError:
                         print('no edge right')
                     try:
-                        removed_edges.append((i, j, i , j + 1, 180))
-                        del self.edges[(i, j, i , j + 1, 180)]
+                        del self.edges[(i, j+1, i , j, 0)]
                     except KeyError:
                         print('no edge up')
                     try:
-                        removed_edges.append((i, j, i - 1, j, 270))
-                        del self.edges[(i, j, i - 1, j, 270)]
+                        del self.edges[(i-1, j, i, j, 90)]
                     except KeyError:
                         print('no edge left')
 
@@ -149,26 +121,28 @@ class Entity:
     def getEdges(self, i, j, edges, prevpos):
         returned_edges = {}
         try:
-            if prevpos != (i, j-1):
+            if prevpos != (i, j, i, j - 1, 0):
                 returned_edges[(i, j, i, j - 1, 0)] = edges[(i, j, i, j - 1, 0)]
         except KeyError:
             print('nice edge down')
         try:
-            if prevpos != (i +1, j ):
+            if prevpos != (i, j, i + 1, j, 90):
                 returned_edges[(i, j, i + 1, j, 90)] = edges[(i, j, i + 1, j, 90)]
         except KeyError:
             print('no edge right')
         try:
-            if prevpos != (i, j +1):
+            if prevpos != (i, j, i , j + 1, 180):
                 returned_edges[(i, j, i , j + 1, 180)] = edges[(i, j, i , j + 1, 180)]
         except KeyError:
             print('no edge up')
         try:
-            if prevpos != (i-1,j):
+            if prevpos != (i, j, i - 1, j, 270):
                 returned_edges[(i, j, i - 1, j, 270)] = edges[(i, j, i - 1, j, 270)]
         except KeyError:
             print('no edge left')
 
+        if not returned_edges:
+            returned_edges[prevpos] = edges[prevpos]
         #returned_edges[(0,1,0,1)] = edges[(0,1,0,1)] #replace with workable values
         return returned_edges
 
@@ -203,6 +177,7 @@ class Entity:
         i, j = self.i, self.j
         tiles = self.map.getTiles()
         usableEedges = self.getEdges(i,j, self.edges, self.prevpos)
+
         width, height = self.map.getSize()
 
         if self.type == 'random-rabbit':
@@ -253,7 +228,8 @@ class Entity:
                 self.way_back.append(reversed_path) #path is prepended so it forms the way back (in reversed order)
                 self.way.append(path)
                 print("path =%s" % str(path))
-                self.prevpos = (i,j)
+
+                self.prevpos = (path[2], path[3], path[0], path[1], (path[4]+180)%360)
                 #path = numpy.random.choice(list_of_candidates, 1, list_of_probabilities) Doesn't work because a should be 1-dimensional
                 self.i, self.j, self.orient = path[2], path[3], path[4]  # pick new position randomly
 
