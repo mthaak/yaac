@@ -115,7 +115,7 @@ class GUI:
 
         # Set view parameters
         self.show_grid = False  # whether grid should be shown
-        self.show_edges = False  # whether edges should be shown
+        self.show_edges = True  # whether edges should be shown
         self.phi, self.theta = 90, 350
         self.zpos = 15
         self.renderer.setOrbit(self.phi, self.theta)
@@ -172,9 +172,10 @@ class GUI:
 
             # Only after move animation is done, the new entity positions are calculated
             if move_done:
+                self.alg.removeEdgesFromTile()
                 self.alg.update()
                 self.alg.evaporate()
-                self.alg.removeEdgesFromTile()
+
 
 
             pygame.display.flip()

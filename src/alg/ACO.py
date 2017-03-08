@@ -54,17 +54,7 @@ class ACO:
 
         self.entities = [
             Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 1, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 3, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 4, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 4, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 5, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 0, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 1, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 3, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 4, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 5, 'random-rabbit', 1, 1, self.edges, 0),
-            Entity(map, 6, 'random-rabbit', 1, 1, self.edges, 0)
+
         ]
 
     def update(self):
@@ -90,24 +80,46 @@ class ACO:
         return
 
     def removeEdgesFromTile(self): #REMOVE THE TIES TO A WATER SQUARE
+        removed_edges = []
         width, height = self.map.getSize()
         for i in range(0, (width)):
             for j in range(0, height):
                 if self.map.getTiles()[i][j] == 1:
-                    try:
-                        self.edges[(i, j, i, j - 1, 0)] = [0.1, 0.1]
+                    try: #4 times edges in
+                        removed_edges.append((i, j, i, j - 1, 0))
+                        del self.edges[(i, j, i, j - 1, 0)]
                     except KeyError:
                         print('nice edge down')
                     try:
-                        self.edges[(i, j, i + 1, j, 90)] = [0.1, 0.1]
+                        removed_edges.append((i, j, i + 1, j, 90))
+                        del self.edges[(i, j, i + 1, j, 90)]
                     except KeyError:
                         print('no edge right')
                     try:
-                        self.edges[(i, j, i , j + 1, 180)] = [0.1, 0.1]
+                        removed_edges.append((i, j, i , j + 1, 180))
+                        del self.edges[(i, j, i , j + 1, 180)]
                     except KeyError:
                         print('no edge up')
                     try:
-                        self.edges[(i, j, i - 1, j, 270)] = [0.1, 0.1]
+                        removed_edges.append((i, j, i - 1, j, 270))
+                        del self.edges[(i, j, i - 1, j, 270)]
+                    except KeyError:
+                        print('no edge left')
+
+                    try: #4 times edges out
+                        del self.edges[(i, j, i, j - 1, 0)]
+                    except KeyError:
+                        print('nice edge down')
+                    try:
+                        del self.edges[(i, j, i + 1, j, 90)]
+                    except KeyError:
+                        print('no edge right')
+                    try:
+                        del self.edges[(i, j, i , j + 1, 180)]
+                    except KeyError:
+                        print('no edge up')
+                    try:
+                        del self.edges[(i, j, i - 1, j, 270)]
                     except KeyError:
                         print('no edge left')
         return
