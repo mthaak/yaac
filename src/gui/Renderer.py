@@ -91,7 +91,7 @@ class Renderer:
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_SMOOTH)  # most obj files expect to be smooth-shaded
 
-    def renderMap(self, select=None, show_grid=False):
+    def renderMap(self, select=None, show_grid=False, edges={}):
         """Renders the complete map."""
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glColor(1.0, 1.0, 1.0)
@@ -110,6 +110,10 @@ class Renderer:
         if show_grid:
             self._resetCamera()
             glCallList(self.grid)  # render grid
+
+        if len(edges) > 0:
+            self._resetCamera()
+            self._renderEdges(edges)
 
     def renderEntities(self, entities):
         """Renders all the entities."""
@@ -393,6 +397,37 @@ class Renderer:
 
         glEndList()
         return dplist
+
+    def _renderEdges(self, edges):
+        glLineWidth(1.0)
+
+        glBegin(GL_LINES)
+        for (i, j, idest, jdest, r) in edges.keys():
+            phero = edges[(i, j, idest, jdest, r)][1]
+            glColor3f(0.0, phero, phero)
+            glVertex3f(3 * i + 1.5, -3 * j - 1.5, 0.35)
+            glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+            if r == 0:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
+            if r == 90:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
+            if r == 180:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
+            if r == 270:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
+        glEnd()
 
     def _getTile(self, i, j):
         """Determines model id and orientation for some tile."""

@@ -115,6 +115,7 @@ class GUI:
 
         # Set view parameters
         self.show_grid = False  # whether grid should be shown
+        self.show_edges = False  # whether edges should be shown
         self.phi, self.theta = 90, 350
         self.zpos = 15
         self.renderer.setOrbit(self.phi, self.theta)
@@ -137,6 +138,8 @@ class GUI:
                     sys.exit()
                 elif e.type == KEYDOWN and e.key == K_g:
                     self.show_grid = not self.show_grid
+                elif e.type == KEYDOWN and e.key == K_e:
+                    self.show_edges = not self.show_edges
                 elif e.type == MOUSEBUTTONDOWN:
                     if e.button == 4:
                         self.zpos = max(9, self.zpos - 1)
@@ -163,7 +166,8 @@ class GUI:
                 self.renderer.setOrbit(self.phi, self.theta)
 
             # Render
-            self.renderer.renderMap(select=self.select, show_grid=self.show_grid)
+            edges = self.alg.edges if self.show_edges else {}
+            self.renderer.renderMap(select=self.select, show_grid=self.show_grid, edges=edges)
             move_done = self.renderer.renderEntities(self.alg.getEntities())
 
             # Only after move animation is done, the new entity positions are calculated
