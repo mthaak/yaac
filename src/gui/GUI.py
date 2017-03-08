@@ -151,6 +151,7 @@ class GUI:
                         self.select = self.renderer.getTileCoords(e.pos[0], e.pos[1], self.screen_height)
                         if self.select is not None:
                             self.map.toggleTile(*self.select)
+                            self.alg.fixEdges(*self.select)  # add/remove edges
 
             if get_pressed()[K_LEFT]:
                 self.phi -= 5
@@ -166,9 +167,17 @@ class GUI:
                 self.renderer.setOrbit(self.phi, self.theta)
 
             # Render
-            edges = self.alg.edges if self.show_edges else {}
-            self.alg.removeEdgesFromTile()
-            self.renderer.renderMap(select=self.select, show_grid=self.show_grid, edges=edges)
+            self.renderer.renderMap(select=self.select)
+            if self.show_grid:
+                self.renderer.renderGrid()
+            if self.show_edges:
+                edges = self.alg.edges
+                try:
+                    best_path = self.alg.getBestPath()
+                except:
+                    best_path = []
+                self.renderer.renderEdges(edges, best_path=best_path)
+
             move_done = self.renderer.renderEntities(self.alg.getEntities())
 
             # Only after move animation is done, the new entity positions are calculated
