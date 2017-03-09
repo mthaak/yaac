@@ -1,10 +1,11 @@
 import sys
 
-import pygame
 from pygame.constants import *
 from pygame.key import *
 
+from src.gui.HUD import HUD, HUDMode
 from src.gui.Renderer import Renderer
+from src.gui.lamina.lamina import *
 
 
 def start_pygame():
@@ -97,33 +98,23 @@ class GUI:
         self.alg = alg
 
         # Set up Pygame
-        start_pygame()
-        # pygame.init()
-        self.screen_width, self.screen_height = 1080, 720
+        # start_pygame()
+
+        pygame.init()
+        self.screen_width, self.screen_height = 1280, 1024
         viewport = (self.screen_width, self.screen_height)
-        hx = viewport[0] / 2
-        hy = viewport[1] / 2
         srf = pygame.display.set_mode(viewport, OPENGL | DOUBLEBUF)
         pygame.display.set_caption('YAAC')
         self.clock = pygame.time.Clock()
 
-        # Set up renderer
-        self.renderer = Renderer(map)
+        self.renderer = Renderer(viewport, map, alg)
+        self.hud = HUD(viewport, map, alg)
 
-        # Set view
-        self.renderer._setView(viewport)
+        self.movingProp = False  # whether a prop is being moved
 
-        # Set view parameters
-        self.show_grid = False  # whether grid should be shown
-        self.show_edges = True  # whether edges should be shown
-        self.phi, self.theta = 90, 350
-        self.zpos = 15
-        self.renderer.setOrbit(self.phi, self.theta)
-        self.renderer.setZoom(self.zpos)
+        self.hud.redraw()  # first draw
 
-        self.select = None
-
-        self.alg.update()  # first update needed to get good orientation
+        self.alg.update()  # first update needed to let entities get correct orientation
 
         self.mainloop()  # start main loop
 
@@ -134,50 +125,203 @@ class GUI:
             for e in pygame.event.get():
                 if e.type == QUIT:
                     sys.exit()
-                elif e.type == KEYDOWN and e.key == K_ESCAPE:
-                    sys.exit()
+
                 elif e.type == KEYDOWN and e.key == K_g:
-                    self.show_grid = not self.show_grid
+                    self.renderer.show_grid = not self.renderer.show_grid
                 elif e.type == KEYDOWN and e.key == K_e:
-                    self.show_edges = not self.show_edges
+                    self.renderer.show_edges = not self.renderer.show_edges
+
+                # HUD mode select
+                if e.type == KEYDOWN and e.key in [K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9]:
+                    self.renderer.selectedTile = None
+                    self.renderer.moveProp = None
+                    self.renderer.newProp = None
+                    self.renderer.oldProp = None
+                    self.movingProp = False
+                if e.type == KEYDOWN and e.key == K_ESCAPE:
+                    self.hud.mode = HUDMode.NONE
+                    self.hud.redraw()
+                elif e.type == KEYDOWN and e.key == K_1:
+                    self.hud.mode = HUDMode.TOGGLE
+                    self.renderer.selectedTile = (-1, -1)
+                    self.hud.redraw()
+                elif e.type == KEYDOWN and e.key == K_2:
+                    self.hud.mode = HUDMode.PLACE_BUNNY
+                    self.renderer.newProp = None  # TODO
+                    self.hud.redraw()
+                elif e.type == KEYDOWN and e.key == K_3:
+                    self.hud.mode = HUDMode.PLACE_START
+                    self.renderer.newProp = None  # TODO
+                    self.hud.redraw()
+                elif e.type == KEYDOWN and e.key == K_4:
+                    self.hud.mode = HUDMode.PLACE_END
+                    self.renderer.newProp = self.map.randomFood(-1, -1)
+                    self.hud.redraw()
+                elif e.type == KEYDOWN and e.key == K_5:
+                    self.hud.mode = HUDMode.PLACE_TREE
+                    self.renderer.newProp = self.map.randomTree(-1, -1)
+                    self.hud.redraw()
+                elif e.type == KEYDOWN and e.key == K_6:
+                    self.hud.mode = HUDMode.PLACE_ROCK
+                    self.renderer.newProp = self.map.randomRock(-1, -1)
+                    self.hud.redraw()
+                elif e.type == KEYDOWN and e.key == K_7:
+                    self.hud.mode = HUDMode.PLACE_DECORATION
+                    self.renderer.newProp = self.map.randomDecoration(-1, -1)
+                    self.hud.redraw()
+                elif e.type == KEYDOWN and e.key == K_8:
+                    self.hud.mode = HUDMode.MOVE
+                    self.renderer.moveProp = (-1, -1)
+                    self.hud.redraw()
+                elif e.type == KEYDOWN and e.key == K_9:
+                    self.hud.mode = HUDMode.DELETE
+                    self.hud.redraw()
+
+                # Mouse events
                 elif e.type == MOUSEBUTTONDOWN:
                     if e.button == 4:
-                        self.zpos = max(9, self.zpos - 1)
-                        self.renderer.setZoom(self.zpos)
+                        self.renderer.zpos = max(9, self.renderer.zpos - 1)
                     elif e.button == 5:
-                        self.zpos = min(50, self.zpos + 1)
-                        self.renderer.setZoom(self.zpos)
+                        self.renderer.zpos = min(50, self.renderer.zpos + 1)
                     elif e.button == 1:
-                        self.select = self.renderer.getTileCoords(e.pos[0], e.pos[1], self.screen_height)
-                        if self.select is not None:
-                            self.map.toggleTile(*self.select)
-                            self.alg.fixEdges(*self.select)  # add/remove edges
+                        if self.hud.mode == HUDMode.TOGGLE:
+                            tile = self.renderer.getTileCoords(e.pos[0], e.pos[1])
+                            if tile is not None:
+                                self.map.toggleTile(*tile)
+                                self.alg.fixEdges(*tile)  # add/remove edges
+                        elif self.hud.mode == HUDMode.PLACE_START:
+                            tile = self.renderer.getTileCoords(e.pos[0], e.pos[1])
+                            if tile is not None and not self.map.tileOccupied(*tile):
+                                pass  # TODO
+                        elif self.hud.mode == HUDMode.PLACE_END:
+                            tile = self.renderer.getTileCoords(e.pos[0], e.pos[1])
+                            if tile is not None and not self.map.tileOccupied(*tile):
+                                self.map.placeProp(self.renderer.newProp)
+                                self.map.addEndPos(*tile)
+                                self.alg.fixEdges(*tile)
+                                self.renderer.newProp = self.map.randomFood(-1, -1)
+                        elif self.hud.mode == HUDMode.PLACE_TREE:
+                            tile = self.renderer.getTileCoords(e.pos[0], e.pos[1])
+                            if tile is not None and not self.map.tileOccupied(*tile):
+                                self.map.placeProp(self.renderer.newProp)
+                                self.alg.fixEdges(*tile)
+                                self.renderer.newProp = self.map.randomTree(-1, -1)
+                        elif self.hud.mode == HUDMode.PLACE_ROCK:
+                            tile = self.renderer.getTileCoords(e.pos[0], e.pos[1])
+                            if tile is not None and not self.map.tileOccupied(*tile):
+                                self.map.placeProp(self.renderer.newProp)
+                                self.alg.fixEdges(*tile)
+                                self.renderer.newProp = self.map.randomRock(-1, -1)
+                        elif self.hud.mode == HUDMode.PLACE_DECORATION:
+                            tile = self.renderer.getTileCoords(e.pos[0], e.pos[1])
+                            if tile is not None and not self.map.tileOccupied(*tile):
+                                self.map.placeProp(self.renderer.newProp)
+                                self.alg.fixEdges(*tile)
+                                self.renderer.newProp = self.map.randomDecoration(-1, -1)
+                        elif self.hud.mode == HUDMode.MOVE:
+                            if self.movingProp:
+                                tile = self.renderer.getTileCoords(e.pos[0], e.pos[1])
+                                if tile is not None and not self.map.tileOccupied(*tile):
+                                    self.map.placeProp(self.renderer.moveProp)
+                                    self.alg.fixEdges(*tile)
+                                    self.renderer.moveProp = (-1, -1)
+                                    self.movingProp = False
+                            else:
+                                tile = self.renderer.getPropCoords(e.pos[0], e.pos[1])
+                                if tile is None:
+                                    tile = self.renderer.getTileCoords(e.pos[0], e.pos[1])
+                                    if tile and self.map.getProp(*tile) is None:
+                                        tile = None
+                                if tile is not None:
+                                    self.renderer.moveProp = self.map.getProp(*tile)
+                                    self.map.removeProp(*tile)
+                                    self.alg.fixEdges(*tile)
+                                    self.movingProp = True
+                        elif self.hud.mode == HUDMode.DELETE:
+                            tile = self.renderer.getPropCoords(e.pos[0], e.pos[1])
+                            if tile is None:
+                                tile = self.renderer.getTileCoords(pos[0], pos[1])
+                                if tile and self.map.getProp(*tile) is None:
+                                    tile = None
+                            if tile is not None:
+                                self.map.removeProp(*tile)
+                                self.alg.fixEdges(*tile)
 
+            # Update camera settings with arrow keys
             if get_pressed()[K_LEFT]:
-                self.phi -= 5
-                self.renderer.setOrbit(self.phi, self.theta)
+                self.renderer.phi -= 5
             if get_pressed()[K_RIGHT]:
-                self.phi += 5
-                self.renderer.setOrbit(self.phi, self.theta)
-            if get_pressed()[K_DOWN] and self.theta >= 280 + 5:
-                self.theta -= 5
-                self.renderer.setOrbit(self.phi, self.theta)
-            if get_pressed()[K_UP] and self.theta <= 350 - 5:
-                self.theta += 5
-                self.renderer.setOrbit(self.phi, self.theta)
+                self.renderer.phi += 5
+            if get_pressed()[K_DOWN] and self.renderer.theta >= 280 + 5:
+                self.renderer.theta -= 5
+            if get_pressed()[K_UP] and self.renderer.theta <= 350 - 5:
+                self.renderer.theta += 5
+
+            # Selection by hovering
+            pos = pygame.mouse.get_pos()
+            if self.hud.mode == HUDMode.TOGGLE:
+                tile = self.renderer.getTileCoords(pos[0], pos[1])
+                if tile is not None:
+                    self.renderer.selectedTile = tile
+            elif self.hud.mode == HUDMode.PLACE_START:
+                tile = self.renderer.getTileCoords(pos[0], pos[1])
+                if tile is not None and not self.map.tileOccupied(*tile):
+                    pass  # TODO
+            elif self.hud.mode == HUDMode.PLACE_END:
+                tile = self.renderer.getTileCoords(pos[0], pos[1])
+                if tile is not None and not self.map.tileOccupied(*tile):
+                    self.renderer.newProp.i, self.renderer.newProp.j = tile
+                else:
+                    self.renderer.newProp.i, self.renderer.newProp.j = (-1, -1)
+            elif self.hud.mode == HUDMode.PLACE_TREE:
+                tile = self.renderer.getTileCoords(pos[0], pos[1])
+                if tile is not None and not self.map.tileOccupied(*tile):
+                    self.renderer.newProp.i, self.renderer.newProp.j = tile
+                else:
+                    self.renderer.newProp.i, self.renderer.newProp.j = (-1, -1)
+            elif self.hud.mode == HUDMode.PLACE_ROCK:
+                tile = self.renderer.getTileCoords(pos[0], pos[1])
+                if tile is not None and not self.map.tileOccupied(*tile):
+                    self.renderer.newProp.i, self.renderer.newProp.j = tile
+                else:
+                    self.renderer.newProp.i, self.renderer.newProp.j = (-1, -1)
+            elif self.hud.mode == HUDMode.PLACE_DECORATION:
+                tile = self.renderer.getTileCoords(pos[0], pos[1])
+                if tile is not None and not self.map.tileOccupied(*tile):
+                    self.renderer.newProp.i, self.renderer.newProp.j = tile
+                else:
+                    self.renderer.newProp.i, self.renderer.newProp.j = (-1, -1)
+            elif self.hud.mode == HUDMode.MOVE:
+                if self.movingProp:
+                    tile = self.renderer.getTileCoords(pos[0], pos[1])
+                    if tile is not None:
+                        self.renderer.moveProp.i, self.renderer.moveProp.j = tile
+                    else:
+                        self.renderer.moveProp.i, self.renderer.moveProp.j = (-1, -1)
+                else:
+                    tile = self.renderer.getPropCoords(pos[0], pos[1])
+                    if tile is None:
+                        tile = self.renderer.getTileCoords(pos[0], pos[1])
+                        if tile and self.map.getProp(*tile) is None:
+                            tile = None
+                    if tile is not None:
+                        self.renderer.moveProp = (tile[0], tile[1])
+                    else:
+                        self.renderer.moveProp = None
+
+            elif self.hud.mode == HUDMode.DELETE:
+                tile = self.renderer.getPropCoords(pos[0], pos[1])
+                if tile is None:
+                    tile = self.renderer.getTileCoords(pos[0], pos[1])
+                    if tile and self.map.getProp(*tile) is None:
+                        tile = None
+                if tile is not None:
+                    self.renderer.oldProp = (tile[0], tile[1])
+                else:
+                    self.renderer.oldProp = None
 
             # Render
-            self.renderer.renderMap(select=self.select)
-            if self.show_grid:
-                self.renderer.renderGrid()
-            if self.show_edges:
-                edges = self.alg.edges
-                try:
-                    best_path = self.alg.getBestPath()
-                except:
-                    best_path = []
-                self.renderer.renderEdges(edges, best_path=best_path)
-
+            self.renderer.renderMap()
             move_done = self.renderer.renderEntities(self.alg.getEntities())
 
             # Only after move animation is done, the new entity positions are calculated
@@ -185,4 +329,5 @@ class GUI:
                 self.alg.update()
                 self.alg.evaporate()
 
+            self.renderer.renderHUD(self.hud.getSurface())
             pygame.display.flip()

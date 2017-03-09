@@ -39,22 +39,9 @@ class ACO:
         return
 
     def fixEdges(self, i, j):
+        """After a tile was toggled or a prop was added or removed, we need to fix the edges."""
         width, height = self.map.getSize()
-        tiles = self.map.getTiles()
-        if tiles[i][j] == 0:  # create new edges
-            if tiles[i][j - 1] != 1 and j != 1:
-                self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
-                self.edges[(i, j - 1, i, j, 180)] = [1, 0.1]
-            if tiles[i + 1][j] != 1 and i != width - 2:
-                self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
-                self.edges[(i + 1, j, i, j, 270)] = [1, 0.1]
-            if tiles[i][j + 1] != 1 and j != height - 2:
-                self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
-                self.edges[(i, j + 1, i, j, 0)] = [1, 0.1]
-            if tiles[i - 1][j] != 1 and i != 1:
-                self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
-                self.edges[(i - 1, j, i, j, 90)] = [1, 0.1]
-        else:  # remove edges
+        if self.map.tileBlocked(i, j):  # remove edges
             edges = [
                 (i, j, i, j - 1, 0),
                 (i, j, i + 1, j, 90),
@@ -67,25 +54,38 @@ class ACO:
             ]
             for edge in edges:
                 try:
-                    del self.edges[edge]
-                except:
+                    self.edges.pop(edge)
+                except KeyError:
                     pass
+        else:  # create new edges
+            if not self.map.tileBlocked(i, j - 1) and j != 1:
+                self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
+                self.edges[(i, j - 1, i, j, 180)] = [1, 0.1]
+            if not self.map.tileBlocked(i + 1, j) and i != width - 2:
+                self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+                self.edges[(i + 1, j, i, j, 270)] = [1, 0.1]
+            if not self.map.tileBlocked(i, j + 1) and j != height - 2:
+                self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
+                self.edges[(i, j + 1, i, j, 0)] = [1, 0.1]
+            if not self.map.tileBlocked(i - 1, j) and i != 1:
+                self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
+                self.edges[(i - 1, j, i, j, 90)] = [1, 0.1]
 
     def generateEdges(self):
+        """Generates all the edges based on the map."""
         edges = {}
         width, height = self.map.getSize()
-        tiles = self.map.getTiles()
         for i in range(1, (width - 1)):
             for j in range(1, height - 1):
-                if tiles[i][j] == 1:
+                if self.map.tileBlocked(i, j):
                     continue
-                if tiles[i][j - 1] != 1 and j != 1:
+                if not self.map.tileBlocked(i, j - 1) and j != 1:
                     edges[(i, j, i, j - 1, 0)] = [1, 0.1]
-                if tiles[i + 1][j] != 1 and i != width - 2:
+                if not self.map.tileBlocked(i + 1, j) and i != width - 2:
                     edges[(i, j, i + 1, j, 90)] = [1, 0.1]
-                if tiles[i][j + 1] != 1 and j != height - 2:
+                if not self.map.tileBlocked(i, j + 1) and j != height - 2:
                     edges[(i, j, i, j + 1, 180)] = [1, 0.1]
-                if tiles[i - 1][j] != 1 and i != 1:
+                if not self.map.tileBlocked(i - 1, j) and i != 1:
                     edges[(i, j, i - 1, j, 270)] = [1, 0.1]
         return edges
 
@@ -118,22 +118,22 @@ class Entity:
             if prevpos != (i, j, i, j - 1, 0):
                 returned_edges[(i, j, i, j - 1, 0)] = edges[(i, j, i, j - 1, 0)]
         except KeyError:
-            print('no edge down')
+            pass  # print('no edge down')
         try:
             if prevpos != (i, j, i + 1, j, 90):
                 returned_edges[(i, j, i + 1, j, 90)] = edges[(i, j, i + 1, j, 90)]
         except KeyError:
-            print('no edge right')
+            pass  # print('no edge right')
         try:
             if prevpos != (i, j, i, j + 1, 180):
                 returned_edges[(i, j, i, j + 1, 180)] = edges[(i, j, i, j + 1, 180)]
         except KeyError:
-            print('no edge up')
+            pass  # print('no edge up')
         try:
             if prevpos != (i, j, i - 1, j, 270):
                 returned_edges[(i, j, i - 1, j, 270)] = edges[(i, j, i - 1, j, 270)]
         except KeyError:
-            print('no edge left')
+            pass  # print('no edge left')
 
         if not returned_edges:
             returned_edges[prevpos] = edges[prevpos]
@@ -169,17 +169,17 @@ class Entity:
 
     def updatePos(self):
         i, j = self.i, self.j
-        tiles = self.map.getTiles()
         usableEedges = self.getEdges(i, j, self.edges, self.prevpos)
-
-        width, height = self.map.getSize()
 
         if self.type == 'rabbit':
             if self.found_food == 1:  # FOOD IS FOUND, GO BACK TO STARTING POINT WHILE DROPPING PHEROMONES
                 path = self.way_back.pop()
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
-                self.edges[reversed_path][1] = self.edges[reversed_path][1] + self.pherodrop
+                try:
+                    self.edges[reversed_path][1] += self.pherodrop
+                except KeyError:  # probably an object was placed on reversed path
+                    pass
                 newpos = (path[2], path[3])
                 if newpos == self.startpos:
                     self.found_food = 0
@@ -211,7 +211,7 @@ class Entity:
                 reversed_path = self.reversed_path(path)
                 self.way_back.append(reversed_path)  # path is prepended so it forms the way back (in reversed order)
                 self.way.append(path)
-                print("path =%s" % str(path))
+                # print("path =%s" % str(path))
 
                 self.prevpos = (path[2], path[3], path[0], path[1], (path[4] + 180) % 360)
                 # path = numpy.random.choice(list_of_candidates, 1, list_of_probabilities) Doesn't work because a should be 1-dimensional
@@ -219,7 +219,7 @@ class Entity:
 
                 newpos = (path[2], path[3])
 
-                if newpos == self.endpos:
+                if newpos in self.endpos:
                     self.found_food = 1
                     path_length = len(self.way_back)
                     if path_length < self.best_path:

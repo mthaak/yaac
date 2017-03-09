@@ -44,6 +44,10 @@ class OBJ:
         self.texcoords = []
         self.faces = []
 
+        min_x, max_x = 100, -100
+        min_y, max_y = 100, -100
+        min_z, max_z = 100, -100
+
         material = None
         for line in open(filename, "r"):
             if line.startswith('#'): continue
@@ -55,6 +59,13 @@ class OBJ:
                 if swapyz:
                     v_list = v_list[0], v_list[2], v_list[1]
                 self.vertices.append(v_list)
+                # Determine min/max
+                min_x = min(v_list[0], min_x)
+                max_x = max(v_list[0], max_x)
+                min_y = min(v_list[1], min_y)
+                max_y = max(v_list[1], max_y)
+                min_z = min(v_list[2], min_z)
+                max_z = max(v_list[2], max_z)
             elif values[0] == 'vn':
                 v = map(float, values[1:4])
                 v_list = list(v)
@@ -84,6 +95,11 @@ class OBJ:
                     else:
                         norms.append(0)
                 self.faces.append((face, norms, texcoords, material))
+
+        # Determine model size
+        self.dx = max_x - min_x
+        self.dy = max_y - min_y
+        self.dz = max_z - min_z
 
         self.gl_list = glGenLists(1)
         glNewList(self.gl_list, GL_COMPILE)

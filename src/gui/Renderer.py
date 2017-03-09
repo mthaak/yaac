@@ -9,77 +9,70 @@ from src.map.Map import *
 
 
 class TileModel(Enum):
-    FLAT_DIRT = 1
-    RIVER_STRAIGHT_DIRT = 2
-    DECLINE_DIRT = 3
-    INCLINE_DIRT = 4
-    RIVER_CORNER_DIRT = 91
-    CLIFF_TOP_CORNER_DIRT = 115
-    CLIFF_TOP_WATERFALL_DIRT = 125
-    CLIFF_TOP_DIRT = 127
-    RIVER_END_DIRT = 145
-    RIVER_TJUNCTION_DIRT = 146
-    RIVER_JUNCTION_DIRT = 147
+    FLAT_DIRT = 'naturepack_extended/Models/naturePack_001.obj'
+    RIVER_STRAIGHT_DIRT = 'naturepack_extended/Models/naturePack_002.obj'
+    DECLINE_DIRT = 'naturepack_extended/Models/naturePack_003.obj'
+    INCLINE_DIRT = 'naturepack_extended/Models/naturePack_004.obj'
+    RIVER_CORNER_DIRT = 'naturepack_extended/Models/naturePack_091.obj'
+    CLIFF_TOP_CORNER_DIRT = 'naturepack_extended/Models/naturePack_115.obj'
+    CLIFF_TOP_WATERFALL_DIRT = 'naturepack_extended/Models/naturePack_125.obj'
+    CLIFF_TOP_DIRT = 'naturepack_extended/Models/naturePack_127.obj'
+    RIVER_END_DIRT = 'naturepack_extended/Models/naturePack_145.obj'
+    RIVER_TJUNCTION_DIRT = 'naturepack_extended/Models/naturePack_146.obj'
+    RIVER_JUNCTION_DIRT = 'naturepack_extended/Models/naturePack_147.obj'
 
 
 class Renderer:
-    def __init__(self, map):
+    def __init__(self, viewport, map, alg):
+        self.viewport = viewport
         self.map = map
+        self.alg = alg
+
+        # OPTIONS
+        self.show_grid = False
+        self.show_edges = True
 
         width, height = map.getSize()
         self.center_x = width / 2 * 3
         self.center_y = height / 2 * -3
-        self.phi, self.theta = 0, 350  # used for camera position
+        self.phi, self.theta = 90, 350  # used for camera position
         self.zpos = 15  # camera zoom
 
         self.background = self._texFromPNG('res/background.png')
 
-        tile_model_ids = [TileModel.FLAT_DIRT,
-                          TileModel.RIVER_STRAIGHT_DIRT,
-                          TileModel.DECLINE_DIRT,
-                          TileModel.INCLINE_DIRT,
-                          TileModel.RIVER_CORNER_DIRT,
-                          TileModel.CLIFF_TOP_CORNER_DIRT,
-                          TileModel.CLIFF_TOP_WATERFALL_DIRT,
-                          TileModel.CLIFF_TOP_DIRT,
-                          TileModel.RIVER_END_DIRT,
-                          TileModel.RIVER_TJUNCTION_DIRT,
-                          TileModel.RIVER_JUNCTION_DIRT]
-
-        # Load tile models
-        os.chdir('../res/naturepack_extended/Models/')  # to prevent file path problems
         self.tile_models = {}
         self.tile_models_mono = {}  # monocolored tiles
-        for tile_model_id in tile_model_ids:
-            path = 'naturePack_{0:03d}.obj'.format(tile_model_id.value)
-            self.tile_models[tile_model_id] = OBJ(path, swapyz=True)
-            self.tile_models_mono[tile_model_id] = OBJ(path, swapyz=True, monocolor=True)
-        os.chdir('../../../src')  # change back
 
-        # Load point models
-        os.chdir('../res/')
-        self.rabbit_hole_model = OBJ('rabbit_hole.obj', swapyz=True)
-        os.chdir('../src')
-        os.chdir('../res/naturepack_extended/Models/')
-        self.rabbit_food_model = OBJ('naturePack_flat_005.obj', swapyz=True)
-        os.chdir('../../../src')
+        self.prop_models = {}
+        self.prop_models_mono = {}  # monocolored props
 
-        # Prepare grid
-        self.grid = self._prepareGrid()
-
-        # Load entity models
-        os.chdir('../res/rabbit/anim_run')
         self.rabbit_models = []
         self.rabbit_anim_frame = 0
         self.rabbit_anim_frames = 17
         self.rabbit_anim_counter = 0
         self.rabbit_anim_frame_length = 1
-        for frame in range(self.rabbit_anim_frames):
-            self.rabbit_models.append(OBJ('rabbit_{0:06d}.obj'.format(frame), swapyz=True, monocolor=True))
-        os.chdir('../../../src')
 
         self.entity_move_frame = 0
         self.entity_move_frames = 10
+
+        self._loadModels()
+
+        # Used for selection
+        self.selectedTile = None
+        self.moveProp = None
+        self.newProp = None
+        self.oldProp = None
+
+        # Prepare grid
+        self.grid = self._prepareGrid()
+
+        # Set initial view settings
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        width, height = viewport
+        gluPerspective(90.0, width / float(height), 1, 100.0)
+        glEnable(GL_DEPTH_TEST)
+        glMatrixMode(GL_MODELVIEW)
 
         # Initialise OpenGL settings
         glLightfv(GL_LIGHT0, GL_POSITION, (-40, 200, 100, 0.0))
@@ -91,7 +84,13 @@ class Renderer:
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_SMOOTH)  # most obj files expect to be smooth-shaded
 
-    def renderMap(self, select=None):
+    def renderHUD(self, screen):
+        glDisable(GL_DEPTH_TEST)
+        glLoadIdentity()
+        screen.display()
+        glEnable(GL_DEPTH_TEST)
+
+    def renderMap(self, selectedTile=None, selectedProp=None, redProp=None, greenProp=None):
         """Renders the complete map."""
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glColor(1.0, 1.0, 1.0)
@@ -101,55 +100,21 @@ class Renderer:
 
         self._resetCamera()
 
-        self._renderTiles(select=select)
+        self._renderTiles(select=selectedTile)
 
         self._resetCamera()
 
-        self._renderPoints()
+        if self.show_grid:
+            self._resetCamera()
+            glCallList(self.grid)
 
-    def renderGrid(self):
+        if self.show_edges:
+            self._resetCamera()
+            self._renderEdges()
+
         self._resetCamera()
-        glCallList(self.grid)
 
-    def renderEdges(self, edges, best_path):
-        self._resetCamera()
-
-        glLineWidth(1.0)
-
-        glBegin(GL_LINES)
-        for (i, j, idest, jdest, r) in edges.keys():
-            if (i, j, idest, jdest, r) in best_path:
-                glColor3f(1.0, 0.0, 0.0)
-            else:
-                phero = edges[(i, j, idest, jdest, r)][1]
-                glColor3f(0.0, phero, phero)
-            glVertex3f(3 * i + 1.5, -3 * j - 1.5, 0.35)
-            glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-            if r == 0:
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
-            if r == 90:
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
-            if r == 180:
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
-            if r == 270:
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
-        glEnd()
-
-    def renderBestPath(self):
-        self._resetCamera()
-        return
+        self._renderProps()
 
     def renderEntities(self, entities):
         """Renders all the entities."""
@@ -198,31 +163,27 @@ class Renderer:
 
         return self.entity_move_frame == 0
 
-    def setOrbit(self, phi, theta):
-        self.phi, self.theta = phi, theta
-
-    def setZoom(self, zpos):
-        self.zpos = zpos
-
-    def getTileCoords(self, x, y, screen_height):
+    def getTileCoords(self, x, y):
         """Gets the tile coordinates (i,j) for the tile under screen coordinates x, y."""
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self._resetCamera()
-        self._renderTiles(self.map, pick=True)
-        color = tuple(glReadPixels(x, screen_height - y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE))
+        self._renderTiles(pick=True)
+        color = tuple(glReadPixels(x, self.viewport[1] - y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE))
         if color in list(self.colorToTile.keys()):
             return self.colorToTile[color]
         else:  # tile not found
             return None
 
-    def _setView(self, viewport):
-        """Sets initial view settings."""
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        width, height = viewport
-        gluPerspective(90.0, width / float(height), 1, 100.0)
-        glEnable(GL_DEPTH_TEST)
-        glMatrixMode(GL_MODELVIEW)
+    def getPropCoords(self, x, y):
+        """Gets the prop coordinates (i,j) for the prop under screen coordinates x, y."""
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self._resetCamera()
+        self._renderProps(pick=True)
+        color = tuple(glReadPixels(x, self.viewport[1] - y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE))
+        if color in list(self.colorToProp.keys()):
+            return self.colorToProp[color]
+        else:  # prop not found
+            return None
 
     def _resetCamera(self):
         """Sets the view such that it looks at the center of the map from the sky."""
@@ -238,6 +199,65 @@ class Renderer:
         gluLookAt(cam_x, cam_y, eye_z,  # camera position
                   self.center_x, self.center_y, self.center_z,  # look at point
                   0.0, 0.0, 1.0)  # up vector
+
+    def _prepareGrid(self):
+        """Prepares a display list for the grid."""
+        # Load textures for characters
+        chars = '0123456789,'
+        # chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz' \
+        #         '0123456789 !@#$%^&*()-=_+\|[]{};:\'",.<>/?`~'
+        char_textures = {}
+        for char in chars:
+            char_textures[char] = self._charTexFromPNG(char)
+
+            # Create display list
+        dplist = glGenLists(1)
+        glNewList(dplist, GL_COMPILE)
+
+        glLineWidth(1.0)
+        glColor3f(1.0, 0.0, 0.0)
+        x_dev, y_dev = 2.3, 2.3
+
+        width, height = self.map.getSize()
+
+        # Draw grid
+        glBegin(GL_LINES)
+        for i in range(1, width):
+            glVertex3f(3 * i, -y_dev, 0.32)
+            glVertex3f(3 * i, -3 * height + y_dev, 0.32)
+        for j in range(1, height):
+            glVertex3f(x_dev, -3 * j, 0.32)
+            glVertex3f(3 * width - x_dev, -3 * j, 0.32)
+        glEnd()
+
+        glColor(1.0, 1.0, 1.0)
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        # Draw coordinates of grid cells
+        char_width, char_height, margin = 0.6, 0.6, 0.1
+        for i in range(0, width):
+            for j in range(0, height):
+                string = '{0},{1}'.format(i, j)
+                for k, c in enumerate(string):
+                    glBindTexture(GL_TEXTURE_2D, char_textures[c])
+                    glBegin(GL_QUADS)
+                    glTexCoord2f(0, 0)
+                    glVertex3f(3 * i + margin + char_width * k, -3 * j - margin, 0.32)
+                    glTexCoord2f(1, 0)
+                    glVertex3f(3 * i + margin + char_width + char_width * k, -3 * j - margin, 0.32)
+                    glTexCoord2f(1, 1)
+                    glVertex3f(3 * i + margin + char_width + char_width * k, -3 * j - margin - char_height, 0.32)
+                    glTexCoord2f(0, 1)
+                    glVertex3f(3 * i + margin + char_width * k, -3 * j - margin - char_height, 0.32)
+                    glEnd()
+
+        glDisable(GL_BLEND)
+        glDisable(GL_TEXTURE_2D)
+
+        glEndList()
+        return dplist
 
     def _renderBackground(self):
         """Renders the background."""
@@ -336,103 +356,109 @@ class Renderer:
             glEnable(GL_LIGHTING)
             glEnable(GL_TEXTURE_2D)
 
-    def _renderPoints(self):
-        """Renders the start and end points."""
-        points = [self.map.getStartPos(), self.map.getEndPos()]
-        scale = 1.0
-        for i, point in enumerate(points):
-            dev_x, dev_y = 0, 0
-            orient = 0
-            if i == 0:
-                orient = 90
-            if i == 1:
-                dev_x, dev_y = 1, -1
+    def _renderProps(self, pick=False):
+        props = self.map.getProps()
+        if self.moveProp and type(self.moveProp) == Prop:
+            selectedProp = [self.moveProp]
+        else:
+            selectedProp = []
+        if self.newProp:
+            newProp = [self.newProp]
+        else:
+            newProp = []
 
-            glTranslate(3 * point[0], -3 * point[1], 0.25)
-
-            glRotate(-orient, 0, 0, 1)
-            if orient == 90 or orient == 180:
-                glTranslate(0, 3, 0)
-            if orient == 180 or orient == 270:
-                glTranslate(-3, 0, 0)
-
-            glTranslate(dev_x, dev_y, 0)
-
-            glScale(scale, scale, scale)
-            if i == 0:
-                glCallList(self.rabbit_hole_model.gl_list)
-            elif i == 1:
-                glCallList(self.rabbit_food_model.gl_list)
-            glScale(1 / scale, 1 / scale, 1 / scale)
-
-            glTranslate(-dev_x, -dev_y, 0)
-
-            if orient == 90 or orient == 180:
-                glTranslate(0, -3, 0)
-            if orient == 180 or orient == 270:
-                glTranslate(3, 0, 0)
-            glRotate(orient, 0, 0, 1)
-
-            glTranslate(-3 * point[0], 3 * point[1], -0.25)
-
-    def _prepareGrid(self):
-        """Prepares a display list for the grid."""
-        # Load textures for characters
-        chars = '0123456789,'
-        # chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz' \
-        #         '0123456789 !@#$%^&*()-=_+\|[]{};:\'",.<>/?`~'
-        char_textures = {}
-        for char in chars:
-            char_textures[char] = self._charTexFromPNG(char)
-
-            # Create display list
-        dplist = glGenLists(1)
-        glNewList(dplist, GL_COMPILE)
-
-        glLineWidth(1.0)
-        glColor3f(1.0, 0.0, 0.0)
-        x_dev, y_dev = 2.3, 2.3
+        if pick:
+            glDisable(GL_TEXTURE_2D)
+            glDisable(GL_LIGHTING)
+            self.colorToProp = {}
 
         width, height = self.map.getSize()
+        for prop in props + selectedProp + newProp:
+            if prop.i < 0 or prop.j < 0:  # not allowed
+                continue
 
-        # Draw grid
+            dx, dy = self.prop_models_mono[prop.model].dx, self.prop_models_mono[prop.model].dy
+
+            glTranslate(3 * prop.i + 0.5 * (3 - dx), -3 * prop.j - 0.5 * (3 - dy), 0.3)
+            glRotate(-prop.r, 0, 0, 1)
+            if prop.r == 90 or prop.r == 180:
+                glTranslate(0, dx, 0)
+            if prop.r == 180 or prop.r == 270:
+                glTranslate(-dy, 0, 0)
+
+            if pick:
+                color = (int(prop.i / width * 255), int(prop.j / height * 255), 255)
+                glColor3ub(*color)
+                self.colorToProp[color] = (prop.i, prop.j)
+                glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
+            elif self.moveProp and \
+                    ((type(self.moveProp) == tuple
+                      and prop.i == self.moveProp[0] and prop.j == self.moveProp[1])
+                     or (type(self.moveProp) == Prop
+                         and prop.i == self.moveProp.i and prop.j == self.moveProp.j)):
+                glColor3f(1.0, 1.0, 1.0)
+                glCallList(self.prop_models_mono[prop.model].gl_list)  # draw prop model
+            elif self.newProp and prop.i == self.newProp.i and prop.j == self.newProp.j:
+                glColor3f(0.0, 1.0, 0.0)
+                glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
+            elif self.oldProp and prop.i == self.oldProp[0] and prop.j == self.oldProp[1]:
+                glColor3f(1.0, 0.0, 0.0)
+                glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
+            else:
+                glCallList(self.prop_models[prop.model].gl_list)  # draw prop model
+
+            if prop.r == 90 or prop.r == 180:
+                glTranslate(0, -dx, 0)
+            if prop.r == 180 or prop.r == 270:
+                glTranslate(dy, 0, 0)
+            glRotate(prop.r, 0, 0, 1)
+
+            glTranslate(-3 * prop.i - 0.5 * (3 - dx), 3 * prop.j + 0.5 * (3 - dy), -0.3)
+
+        if pick:
+            glEnable(GL_LIGHTING)
+            glEnable(GL_TEXTURE_2D)
+
+    def _renderEdges(self):
+        edges = self.alg.edges
+        try:
+            best_path = self.alg.getBestPath()
+        except:
+            best_path = []
+
+        glLineWidth(1.0)
         glBegin(GL_LINES)
-        for i in range(1, width):
-            glVertex3f(3 * i, -y_dev, 0.32)
-            glVertex3f(3 * i, -3 * height + y_dev, 0.32)
-        for j in range(1, height):
-            glVertex3f(x_dev, -3 * j, 0.32)
-            glVertex3f(3 * width - x_dev, -3 * j, 0.32)
+        for (i, j, idest, jdest, r) in edges.keys():
+            if (i, j, idest, jdest, r) in best_path:
+                phero = 100  # for check later
+                glColor3f(1.0, 0.0, 0.0)
+            else:
+                phero = edges[(i, j, idest, jdest, r)][1]
+                glColor3f(0.0, phero, phero)
+            if not edges[(idest, jdest, i, j, (r + 180) % 360)][1] > phero:  # prevent draw in both directions
+                glVertex3f(3 * i + 1.5, -3 * j - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+            if r == 0:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
+            if r == 90:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
+            if r == 180:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
+            if r == 270:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
         glEnd()
-
-        glColor(1.0, 1.0, 1.0)
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        # Draw coordinates of grid cells
-        char_width, char_height, margin = 0.6, 0.6, 0.1
-        for i in range(0, width):
-            for j in range(0, height):
-                string = '{0},{1}'.format(i, j)
-                for k, c in enumerate(string):
-                    glBindTexture(GL_TEXTURE_2D, char_textures[c])
-                    glBegin(GL_QUADS)
-                    glTexCoord2f(0, 0)
-                    glVertex3f(3 * i + margin + char_width * k, -3 * j - margin, 0.32)
-                    glTexCoord2f(1, 0)
-                    glVertex3f(3 * i + margin + char_width + char_width * k, -3 * j - margin, 0.32)
-                    glTexCoord2f(1, 1)
-                    glVertex3f(3 * i + margin + char_width + char_width * k, -3 * j - margin - char_height, 0.32)
-                    glTexCoord2f(0, 1)
-                    glVertex3f(3 * i + margin + char_width * k, -3 * j - margin - char_height, 0.32)
-                    glEnd()
-
-        glDisable(GL_BLEND)
-        glDisable(GL_TEXTURE_2D)
-
-        glEndList()
-        return dplist
 
     def _getTile(self, i, j):
         """Determines model id and orientation for some tile."""
@@ -441,9 +467,9 @@ class Renderer:
         model_id, orientation = 0, 0
         if ((i == 0 or i == width - 1) and not (j == 0 or j == height - 1)) \
                 or ((j == 0 or j == height - 1) and not (i == 0 or i == width - 1)):
-            if tiles[i][j] == Tile.LAND.value:
+            if tiles[i][j] == TileType.LAND.value:
                 model_id = TileModel.CLIFF_TOP_DIRT
-            elif tiles[i][j] == Tile.WATER.value:
+            elif tiles[i][j] == TileType.WATER.value:
                 model_id = TileModel.CLIFF_TOP_WATERFALL_DIRT
             if i == 0:
                 orientation = 0
@@ -465,9 +491,9 @@ class Renderer:
             elif i == width - 1 and j == height - 1:
                 orientation = 270
         else:
-            if tiles[i][j] == Tile.LAND.value:
+            if tiles[i][j] == TileType.LAND.value:
                 model_id = TileModel.FLAT_DIRT
-            elif tiles[i][j] == Tile.WATER.value:
+            elif tiles[i][j] == TileType.WATER.value:
                 neighbours = tiles[i][j - 1], tiles[i + 1][j], tiles[i][j + 1], tiles[i - 1][j]  # n, e, s, w
                 if neighbours == (0, 0, 0, 0):
                     model_id = TileModel.RIVER_END_DIRT  # TODO create water pool
@@ -515,6 +541,36 @@ class Renderer:
                 elif neighbours == (1, 1, 1, 1):
                     model_id = TileModel.RIVER_JUNCTION_DIRT
         return model_id, orientation
+
+    def _loadModels(self):
+        os.chdir('../res/')
+
+        # Load tiles
+        os.chdir('naturepack_extended/Models/')
+        for model in TileModel:
+            filename = os.path.basename(model.value)
+            self.tile_models[model] = OBJ(filename, swapyz=True)
+            self.tile_models_mono[model] = OBJ(filename, swapyz=True, monocolor=True)
+        os.chdir('../../')
+
+        # Load props
+        os.chdir('naturepack_extended/Models/')
+        for model in PropModel:
+            if type(model.value) == str and 'naturepack_extended' in model.value:
+                filename = os.path.basename(model.value)
+                self.prop_models[model] = OBJ(filename, swapyz=True)
+                self.prop_models_mono[model] = OBJ(filename, swapyz=True, monocolor=True)
+        os.chdir('../../')  # change back
+        self.prop_models[PropModel.HOLE] = OBJ(PropModel.HOLE.value, swapyz=True)
+        self.prop_models_mono[PropModel.HOLE] = OBJ(PropModel.HOLE.value, swapyz=True, monocolor=True)
+
+        # Load entities
+        os.chdir('rabbit/anim_run/')
+        for frame in range(self.rabbit_anim_frames):
+            self.rabbit_models.append(OBJ('rabbit_{0:06d}.obj'.format(frame), swapyz=True, monocolor=True))
+        os.chdir('../../')
+
+        os.chdir('../src/')
 
     def _texFromPNG(self, filename):
         """Creates a texture from a PNG image."""

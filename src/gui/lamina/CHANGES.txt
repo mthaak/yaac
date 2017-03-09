@@ -1,0 +1,36 @@
+
+
+lamina 0.2.1
+
+  * 26 January 2008
+  * Fixed memory leak in 'clear' method
+  * added missing module warning, if demos run without prerequisite
+    GUI library installed.
+
+
+lamina 0.2   
+  
+  * 12 July 2007
+  * Updates use glTexSubImage2D to only change the part of the 
+    texture that is 'dirty'
+  * added a demo 'pyg_lam.py' that does not need any GUI, using 
+    pygame drawing only.
+
+
+lamina 0.1.1
+
+  * PanelOverlaySurface renamed to LaminaPanelSurface
+  * module documented more thoroughly
+  * LaminaPanelSurface null 'update' method removed
+  * add LaminaScreenSurface subclass
+    - no params to init, autosizes to fit 100% of screen
+    - refreshPosition method repositions and resizes to stay
+      full-screen after camera and/or perspective changes
+  * add l04_lamzoom_* scripts to demo refreshPosition
+  * simplified *_lam demos to not need vec*, mat*, quat*
+    files, and removed those from distro.
+
+
+lamina 0.1
+
+  * original
