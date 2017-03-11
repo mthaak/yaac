@@ -1,4 +1,5 @@
 import random
+from enum import Enum
 
 
 class ACO:
@@ -8,16 +9,14 @@ class ACO:
         self.edges = self.generateEdges()
 
         width, height = self.map.getSize()
-        self.best_path = (width - 1) * (height - 1)
-
+        best_path = (width - 2) * (height - 2)
         self.entities = [
-            Entity(map, 0, 'rabbit', 1, 1, self.edges, 0, self.best_path),
-            Entity(map, 0, 'rabbit', 1, 1, self.edges, 0, self.best_path),
-            Entity(map, 0, 'rabbit', 1, 1, self.edges, 0, self.best_path),
-            Entity(map, 0, 'rabbit', 1, 1, self.edges, 0, self.best_path),
-            Entity(map, 0, 'rabbit', 1, 1, self.edges, 0, self.best_path)
+            Entity(map, 0, 'rabbit', RabbitColor.WHITE, 1, 1, 0, self.edges, 0, best_path),
+            Entity(map, 0, 'rabbit', RabbitColor.GREY, 1, 1, 0, self.edges, 0, best_path),
+            Entity(map, 0, 'rabbit', RabbitColor.BLACK, 1, 1, 0, self.edges, 0, best_path),
+            Entity(map, 0, 'rabbit', RabbitColor.BROWN, 1, 1, 0, self.edges, 0, best_path),
+            Entity(map, 0, 'rabbit', RabbitColor.BEIGE, 1, 1, 0, self.edges, 0, best_path)
         ]
-        self.best_path = (width - 1) * (height - 1)
 
     def update(self):
         changed = False
@@ -25,8 +24,14 @@ class ACO:
             changed |= entity.updatePos()
         return changed
 
+    def placeEntity(self, entity):
+        self.entities.append(entity)
+
     def getEntities(self):
         return self.entities
+
+    def getBestPath(self):
+        return min([entity.best_path for entity in self.entities])
 
     def evaporate(self):
         rho = 0.05  # evaporation rate
@@ -91,13 +96,14 @@ class ACO:
 
 
 class Entity:
-    def __init__(self, map, index, type, i, j, edges, found_food, best_path):
+    def __init__(self, map, index, type, color, i, j, orient, edges, found_food, best_path):
         self.map = map
         self.index = index
         self.type = 'rabbit'  # TODO create other possibilities
+        self.color = color
         self.i = i
         self.j = j
-        self.orient = 0
+        self.orient = orient
         self.edges = edges
         self.alpha = 2  # This can be anything, and might be variable
         self.beta = 10  # This can be anyting, and might be variable
@@ -107,10 +113,11 @@ class Entity:
         self.way = []
         self.way_back = []
         # self.startpos = self.map.getStartPos()
-        self.startpos = (i, j)
-        self.endpos = self.map.getEndPos()
+        self.start_pos = (i, j)  # TODO allow multiple start positions
+        self.end_pos = self.map.getEndPos()
         self.prevpos = ()
         self.best_path = best_path
+        self.is_lost = False  # whether entity lost its path back to its start
 
     def getEdges(self, i, j, edges, prevpos):
         returned_edges = {}
@@ -169,7 +176,7 @@ class Entity:
 
     def updatePos(self):
         i, j = self.i, self.j
-        usableEedges = self.getEdges(i, j, self.edges, self.prevpos)
+        usable_edges = self.getEdges(i, j, self.edges, self.prevpos)
 
         if self.type == 'rabbit':
             if self.found_food == 1:  # FOOD IS FOUND, GO BACK TO STARTING POINT WHILE DROPPING PHEROMONES
@@ -179,27 +186,27 @@ class Entity:
                 try:
                     self.edges[reversed_path][1] += self.pherodrop
                 except KeyError:  # probably an object was placed on reversed path
-                    pass
+                    self.is_lost = True  # TODO have the entity actually be lost and having to find a way back to a home
                 newpos = (path[2], path[3])
-                if newpos == self.startpos:
+                if newpos == self.start_pos:
                     self.found_food = 0
                 return True
 
-            elif usableEedges:
+            elif usable_edges:
                 k = {}
                 p = {}
                 sum_pheromones = 0
                 sum_probability = 0
                 list_of_candidates = []
                 list_of_probabilities = []
-                for edge in usableEedges:  # this loop calculates the sum of weighted pheromones of all options
-                    k[edge] = usableEedges[edge]
+                for edge in usable_edges:  # this loop calculates the sum of weighted pheromones of all options
+                    k[edge] = usable_edges[edge]
                     weighted_eta = (k[edge][1]) ** self.alpha
                     weighted_pheromone = (k[edge][0]) ** self.beta
                     sum_pheromones += (weighted_pheromone * weighted_eta)
                     list_of_candidates.append(edge)
                 for edge in list_of_candidates:  # this loop calculates the probability of the entity taking an edge for every edge
-                    k[edge] = usableEedges[edge]
+                    k[edge] = usable_edges[edge]
                     weighted_eta = (k[edge][1]) ** self.alpha
                     weighted_pheromone = (k[edge][0]) ** self.beta
                     p[edge] = (weighted_pheromone * weighted_eta) / sum_pheromones
@@ -219,7 +226,7 @@ class Entity:
 
                 newpos = (path[2], path[3])
 
-                if newpos in self.endpos:
+                if newpos in self.end_pos:
                     self.found_food = 1
                     path_length = len(self.way_back)
                     if path_length < self.best_path:
@@ -230,3 +237,19 @@ class Entity:
                 return True
 
         return False  # not changed
+
+    @staticmethod
+    def randomRabbit(map, alg, i, j):
+        width, height = map.getSize()
+        best_path = (width - 2) * (height - 2)
+        return Entity(map, 0, 'rabbit', random.choice(list(RabbitColor)), i, j, random.choice([0, 90, 180, 270]),
+                      alg.edges, 0, best_path)
+
+
+class RabbitColor(Enum):
+    WHITE = 0
+    GREY = 1
+    BLACK = 2
+    BROWN = 3
+    BEIGE = 4
+    ORANGE = 5

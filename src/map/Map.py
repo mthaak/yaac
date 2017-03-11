@@ -4,8 +4,8 @@ from enum import Enum
 
 class Map:
     def __init__(self):
-        self.startPos = (1, 1)
-        self.endPos = [(9, 6)]
+        self.start_pos = [(1, 1)]
+        self.end_pos = [(9, 6)]
 
         tiles = [  # 0 = land, 1 = water
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
@@ -34,16 +34,22 @@ class Map:
         return (11, 8)
 
     def getStartPos(self):
-        return self.startPos  # (x, y) counting from 0
+        return self.start_pos
+
+    def addStartPos(self, i, j):
+        self.start_pos.append((i, j))
+
+    def removeStartPos(self, i, j):
+        self.start_pos.remove((i, j))
 
     def getEndPos(self):
-        return self.endPos
+        return self.end_pos
 
     def addEndPos(self, i, j):
-        self.endPos.append((i, j))
+        self.end_pos.append((i, j))
 
     def removeEndPos(self, i, j):
-        self.endPos.remove((i, j))
+        self.end_pos.remove((i, j))
 
     def getTiles(self):
         return self.tiles
@@ -54,7 +60,7 @@ class Map:
             return True
         for prop in self.props:
             if prop.i == i and prop.j == j \
-                    and (prop.model in PropModel.tree() + PropModel.rock()):
+                    and (prop.model in PropModel.trees() + PropModel.rocks()):
                 return True
         return False
 
@@ -79,14 +85,14 @@ class Map:
                 return prop
         return None
 
-    def createProp(self, i, j, r, model):
-        self.props.append(Prop(i, j, r, model))
+    def placeProp(self, prop):
+        self.props.append(prop)
 
     def removeProp(self, i, j):
         prop = self.getProp(i, j)
         if prop:
             self.props.remove(prop)
-            if (i, j) in self.endPos:
+            if (i, j) in self.end_pos:
                 self.removeEndPos(i, j)
 
     def moveProp(self, oldi, oldj, newi, newj):
@@ -94,20 +100,17 @@ class Map:
         if prop:
             prop.i, prop.j = newi, newj
 
-    def placeProp(self, prop):
-        self.props.append(prop)
-
-    def randomFood(self, i, j):
-        return Prop(i, j, random.choice([0, 90, 180, 270]), random.choice(PropModel.food()))
-
-    def randomTree(self, i, j):
-        return Prop(i, j, random.choice([0, 90, 180, 270]), random.choice(PropModel.tree()))
-
-    def randomRock(self, i, j):
-        return Prop(i, j, random.choice([0, 90, 180, 270]), random.choice(PropModel.rock()))
-
-    def randomDecoration(self, i, j):
-        return Prop(i, j, random.choice([0, 90, 180, 270]), random.choice(PropModel.decoration()))
+    def print(self):
+        """Can be used for designing maps within the application."""
+        tiles = list(map(list, zip(*self.tiles)))  # transposed
+        print('tiles = [')
+        for row in tiles:
+            print('\t' + repr(row))
+        print(']')
+        print('props = [')
+        for prop in self.props:
+            print('\t' + repr(prop))
+        print(']')
 
 
 class TileType(Enum):
@@ -122,6 +125,29 @@ class Prop:
         assert type(r) == int and r in [0, 90, 180, 270]
         assert type(model) == PropModel
         self.i, self.j, self.r, self.model = i, j, r, model
+
+    @staticmethod
+    def randomHole(i, j):
+        return Prop(i, j, random.choice([0, 90, 180, 270]), PropModel.HOLE)
+
+    @staticmethod
+    def randomFood(i, j):
+        return Prop(i, j, random.choice([0, 90, 180, 270]), random.choice(PropModel.food()))
+
+    @staticmethod
+    def randomTree(i, j):
+        return Prop(i, j, random.choice([0, 90, 180, 270]), random.choice(PropModel.trees()))
+
+    @staticmethod
+    def randomRock(i, j):
+        return Prop(i, j, random.choice([0, 90, 180, 270]), random.choice(PropModel.rocks()))
+
+    @staticmethod
+    def randomDecoration(i, j):
+        return Prop(i, j, random.choice([0, 90, 180, 270]), random.choice(PropModel.decoration()))
+
+    def __repr__(self):
+        return "Prop({0}, {1}, {2}, {3})".format(self.i, self.j, self.r, self.model)
 
 
 class PropModel(Enum):
@@ -163,12 +189,12 @@ class PropModel(Enum):
                 PropModel.PLANT_6]
 
     @staticmethod
-    def tree():
+    def trees():
         return [PropModel.TREE_ORANGE,
                 PropModel.TREE_LONG]
 
     @staticmethod
-    def rock():
+    def rocks():
         return [PropModel.GREY_ROCK]
 
     @staticmethod

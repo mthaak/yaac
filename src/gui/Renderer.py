@@ -4,6 +4,7 @@ import os
 import numpy
 from OpenGL.GLU import *
 
+from src.alg.ACO import RabbitColor
 from src.gui.objloader import *
 from src.map.Map import *
 
@@ -56,12 +57,14 @@ class Renderer:
         self.entity_move_frames = 10
 
         self._loadModels()
+        self.question_mark = self._charTexFromPNG('?', color=(0, 255, 255))  # used for show entity is lost
 
         # Used for selection
-        self.selectedTile = None
-        self.moveProp = None
-        self.newProp = None
-        self.oldProp = None
+        self.selected_tile = None
+        self.move_prop = None
+        self.new_prop = None
+        self.old_prop = None
+        self.new_entity = None
 
         # Prepare grid
         self.grid = self._prepareGrid()
@@ -120,10 +123,19 @@ class Renderer:
         """Renders all the entities."""
         self._resetCamera()
 
+        if self.new_entity:
+            new_entity = [self.new_entity]
+        else:
+            new_entity = []
+
         scale = 0.05
-        dev_x, dev_y = 1.5, -1
-        for i, entity in enumerate(entities):
+        dev_x, dev_y = 1.5, -1.5
+        for i, entity in enumerate(entities + new_entity):
+            if entity.i < 0 or entity.j < 0:  # not allowed
+                continue
+
             glTranslate(3 * entity.i, -3 * entity.j, 0.25)
+
             glRotate(-entity.orient, 0, 0, 1)
 
             if entity.orient == 90 or entity.orient == 180:
@@ -131,20 +143,60 @@ class Renderer:
             if entity.orient == 180 or entity.orient == 270:
                 glTranslate(-3, 0, 0)
 
-            glTranslate(dev_x, dev_y - 3 + self.entity_move_frame / self.entity_move_frames * 3, 0)
+            glTranslate(dev_x, dev_y, 0)
+
+            if not entity == self.new_entity:
+                glTranslate(0, - 3 + self.entity_move_frame / self.entity_move_frames * 3, 0)
+
+            if entity.is_lost:
+                # Draw question mark
+                rotation = entity.orient + self.phi + 90
+                glRotate(rotation, 0, 0, 1)
+                glTranslate(-0.25, 0, 1)
+                glEnable(GL_TEXTURE_2D)
+                glEnable(GL_BLEND)
+                glDisable(GL_LIGHTING)
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+                glBindTexture(GL_TEXTURE_2D, self.question_mark)
+                glBegin(GL_QUADS)
+                glTexCoord2f(0, 0)
+                glVertex3f(0, 0, 0.5)
+                glTexCoord2f(1, 0)
+                glVertex3f(0.5, 0, 0.5)
+                glTexCoord2f(1, 1)
+                glVertex3f(0.5, 0, 0)
+                glTexCoord2f(0, 1)
+                glVertex3f(0, 0, 0)
+                glEnd()
+                glEnable(GL_LIGHTING)
+                glDisable(GL_BLEND)
+                glDisable(GL_TEXTURE_2D)
+                glTranslate(0.25, 0, -1)
+                glRotate(-rotation, 0, 0, 1)
 
             glScale(scale, scale, scale)
+            if entity == self.new_entity:
+                glColor3f(0.0, 1.0, 0.0)  # draw in red
             # Give the rabbits a different color
-            if i == 0:
+            elif entity.color == RabbitColor.WHITE:
                 glColor(1.0, 1.0, 1.0)
-            elif i == 1:
+            elif entity.color == RabbitColor.GREY:
                 glColor(0.1, 0.1, 0.1)
-            elif i == 2:
+            elif entity.color == RabbitColor.BLACK:
+                glColor(0.0, 0.0, 0.0)
+            elif entity.color == RabbitColor.BROWN:
                 glColor(0.40, 0.27, 0.20)
+            elif entity.color == RabbitColor.BEIGE:
+                glColor(0.95, 0.84, 0.62)
+            elif entity.color == RabbitColor.ORANGE:
+                glColor(0.80, 0.39, 0.16)
             glCallList(self.rabbit_models[self.rabbit_anim_frame].gl_list)
             glScale(1 / scale, 1 / scale, 1 / scale)
 
-            glTranslate(-dev_x, -dev_y + 3 - self.entity_move_frame / self.entity_move_frames * 3, 0)
+            glTranslate(-dev_x, -dev_y, 0)
+
+            if not entity == self.new_entity:
+                glTranslate(0, 3 - self.entity_move_frame / self.entity_move_frames * 3, 0)
 
             if entity.orient == 90 or entity.orient == 180:
                 glTranslate(0, -3, 0)
@@ -194,9 +246,9 @@ class Renderer:
         to_rad = (math.pi / 180)
         cam_x = self.center_x + self.zpos * math.cos(self.phi * to_rad) * math.sin(self.theta * to_rad)
         cam_y = self.center_y + self.zpos * math.sin(self.phi * to_rad) * math.sin(self.theta * to_rad)
-        eye_z = self.center_z + self.zpos * math.cos(self.theta * to_rad)
+        cam_z = self.center_z + self.zpos * math.cos(self.theta * to_rad)
         # Set the camera position and look at point
-        gluLookAt(cam_x, cam_y, eye_z,  # camera position
+        gluLookAt(cam_x, cam_y, cam_z,  # camera position
                   self.center_x, self.center_y, self.center_z,  # look at point
                   0.0, 0.0, 1.0)  # up vector
 
@@ -210,7 +262,7 @@ class Renderer:
         for char in chars:
             char_textures[char] = self._charTexFromPNG(char)
 
-            # Create display list
+        # Create display list
         dplist = glGenLists(1)
         glNewList(dplist, GL_COMPILE)
 
@@ -358,14 +410,14 @@ class Renderer:
 
     def _renderProps(self, pick=False):
         props = self.map.getProps()
-        if self.moveProp and type(self.moveProp) == Prop:
-            selectedProp = [self.moveProp]
+        if self.move_prop and type(self.move_prop) == Prop:
+            selected_prop = [self.move_prop]
         else:
-            selectedProp = []
-        if self.newProp:
-            newProp = [self.newProp]
+            selected_prop = []
+        if self.new_prop:
+            new_prop = [self.new_prop]
         else:
-            newProp = []
+            new_prop = []
 
         if pick:
             glDisable(GL_TEXTURE_2D)
@@ -373,7 +425,7 @@ class Renderer:
             self.colorToProp = {}
 
         width, height = self.map.getSize()
-        for prop in props + selectedProp + newProp:
+        for prop in props + selected_prop + new_prop:
             if prop.i < 0 or prop.j < 0:  # not allowed
                 continue
 
@@ -391,17 +443,17 @@ class Renderer:
                 glColor3ub(*color)
                 self.colorToProp[color] = (prop.i, prop.j)
                 glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
-            elif self.moveProp and \
-                    ((type(self.moveProp) == tuple
-                      and prop.i == self.moveProp[0] and prop.j == self.moveProp[1])
-                     or (type(self.moveProp) == Prop
-                         and prop.i == self.moveProp.i and prop.j == self.moveProp.j)):
+            elif self.move_prop and \
+                    ((type(self.move_prop) == tuple
+                      and prop.i == self.move_prop[0] and prop.j == self.move_prop[1])
+                     or (type(self.move_prop) == Prop
+                         and prop.i == self.move_prop.i and prop.j == self.move_prop.j)):
                 glColor3f(1.0, 1.0, 1.0)
                 glCallList(self.prop_models_mono[prop.model].gl_list)  # draw prop model
-            elif self.newProp and prop.i == self.newProp.i and prop.j == self.newProp.j:
+            elif self.new_prop and prop.i == self.new_prop.i and prop.j == self.new_prop.j:
                 glColor3f(0.0, 1.0, 0.0)
                 glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
-            elif self.oldProp and prop.i == self.oldProp[0] and prop.j == self.oldProp[1]:
+            elif self.old_prop and prop.i == self.old_prop[0] and prop.j == self.old_prop[1]:
                 glColor3f(1.0, 0.0, 0.0)
                 glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
             else:
@@ -421,20 +473,20 @@ class Renderer:
 
     def _renderEdges(self):
         edges = self.alg.edges
-        try:
-            best_path = self.alg.getBestPath()
-        except:
-            best_path = []
+        # try:
+        #     best_path = self.alg.getBestPath()
+        # except:
+        #     best_path = []
 
         glLineWidth(1.0)
         glBegin(GL_LINES)
         for (i, j, idest, jdest, r) in edges.keys():
-            if (i, j, idest, jdest, r) in best_path:
-                phero = 100  # for check later
-                glColor3f(1.0, 0.0, 0.0)
-            else:
-                phero = edges[(i, j, idest, jdest, r)][1]
-                glColor3f(0.0, phero, phero)
+            # if (i, j, idest, jdest, r) in best_path:
+            #     phero = 100  # for check later
+            #     glColor3f(1.0, 0.0, 0.0)
+            # else:
+            phero = edges[(i, j, idest, jdest, r)][1]
+            glColor3f(0.0, phero, phero)
             if not edges[(idest, jdest, i, j, (r + 180) % 360)][1] > phero:  # prevent draw in both directions
                 glVertex3f(3 * i + 1.5, -3 * j - 1.5, 0.35)
                 glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
@@ -588,7 +640,7 @@ class Renderer:
                      img_data)
         return texture
 
-    def _charTexFromPNG(self, char):
+    def _charTexFromPNG(self, char, color=None):
         """Creates a texture of a text character from a image of characters."""
         # Draw coordinates
         os.chdir('gui/bmpfont')
@@ -597,6 +649,11 @@ class Renderer:
         img = pygame.image.load('font.png')
         os.chdir('../..')
         img_data = numpy.array(list(img.get_view().raw), numpy.uint8)
+
+        if color:
+            for i in range(0, len(img_data), 4):
+                if img_data[i] != 255 or img_data[i + 1] != 255 or img_data[i + 2] != 255:
+                    img_data[i], img_data[i + 1], img_data[i + 2] = color[0], color[1], color[2]
 
         width, height, chars_per_line = 8, 16, 8
         img_x, img_y = bmpfont.chartable[char]

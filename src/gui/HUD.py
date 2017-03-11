@@ -15,7 +15,10 @@ class HUD:
 
         self.mode = HUDMode.NONE
 
-    def redraw(self):
+        self.fps = 60
+        self.move_frames = 10
+
+    def refresh(self):
         self.screen.clear()
 
         modes_x, modes_y, modes_line_height = 10, 10, 30
@@ -23,13 +26,13 @@ class HUD:
         font = pygame.font.Font(None, 20)
         big_font = pygame.font.Font(None, 28)
 
-        txt = big_font.render('Mode', 1, (0, 0, 0))
+        txt = big_font.render('Modes', 1, (0, 0, 0))
         self.screen.surf.blit(txt, (modes_x, modes_y))
 
         text = [
             'None',
             'Toggle tiles (1)',
-            'Place bunny (2)',
+            'Place rabbit (2)',
             'Place hole (3)',
             'Place food (4)',
             'Place tree (5)',
@@ -50,17 +53,41 @@ class HUD:
             else:
                 pygame.draw.polygon(self.screen.surf, (0, 0, 0), square, 2)
 
+        txt = big_font.render('Other hotkeys', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (200, 10))
+        txt = font.render('Show grid (g)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (200, 40))
+        txt = font.render('Show edges (e)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (200, 70))
+        txt = font.render('Print map in console (p)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (200, 100))
+
+        txt = font.render('Number of rabbits: ' + str(len(self.alg.getEntities())), 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (1100, 10))
+        txt = font.render('Best path: ' + str(self.alg.getBestPath()), 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (1100, 40))
+        txt = font.render('FPS: ' + str(round(self.fps, 2)), 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (1100, 70))
+        txt = font.render('Move frames (,.): ' + str(self.move_frames), 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (1100, 100))
+
         self.screen.refresh()
-        self.screen.refreshPosition()
+        # self.screen.refreshPosition()
 
     def getSurface(self):
         return self.screen
+
+    def updateFPS(self, fps):
+        self.fps = fps
+
+    def updateMoveFrames(self, move_frames):
+        self.move_frames = move_frames
 
 
 class HUDMode(Enum):
     NONE = 0  # (Esc)
     TOGGLE = 1  # (T)
-    PLACE_BUNNY = 2  # (B)
+    PLACE_RABBIT = 2  # (B)
     PLACE_START = 3  # (H)
     PLACE_END = 4  # (F)
     PLACE_TREE = 5  # (T)
