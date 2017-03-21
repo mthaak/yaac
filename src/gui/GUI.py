@@ -144,6 +144,8 @@ class GUI:
                 elif e.type == KEYDOWN and e.key == K_PERIOD:
                     self.renderer.entity_move_frames += 1
                     self.hud.updateMoveFrames(self.renderer.entity_move_frames)
+                elif e.type == KEYDOWN and e.key == K_m:
+                    self.map.toggleMap()
 
                 # HUD mode select
                 if e.type == KEYDOWN and e.key in [K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9]:
