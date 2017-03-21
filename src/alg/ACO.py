@@ -24,6 +24,9 @@ class ACO:
             changed |= entity.updatePos()
         return changed
 
+    def makeEntity(self, index, type, color, i, j, orient, edges, found_food, best_path):
+        self.entities.append(Entity(self.map, index, type, color, i, j, orient, edges, found_food, best_path))
+
     def placeEntity(self, entity):
         self.entities.append(entity)
 
@@ -97,27 +100,27 @@ class ACO:
 
 class Entity:
     def __init__(self, map, index, type, color, i, j, orient, edges, found_food, best_path):
-        self.map = map
-        self.index = index
+        self.map = map # The map in which the entity is wondering
+        self.index = index # The number of the entity
         self.type = 'rabbit'  # TODO create other possibilities
-        self.color = color
-        self.i = i
-        self.j = j
-        self.orient = orient
-        self.edges = edges
-        self.alpha = 2  # This can be anything, and might be variable
-        self.beta = 10  # This can be anyting, and might be variable
+        self.color = color # The color of the entity
+        self.i = i # X-coordinate
+        self.j = j # Y-coordinate
+        self.orient = orient # the orientation of the entity (which direction it is facing)
+        self.edges = edges # All edges that are on the map
+        self.alpha = 2  # Alpha value
+        self.beta = 10  # Beta value
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
-        self.found_food = found_food
-        self.step_count = 0
-        self.way = []
-        self.way_back = []
+        self.found_food = found_food # Whether the entity found food or not
+        self.step_count = 0 # The number of steps the entity has taken towards the target
+        self.way = [] # The edges it walked along on its' way to the target
+        self.way_back = [] # The edges it will take on its' way back to the starting point
         # self.startpos = self.map.getStartPos()
         self.start_pos = (i, j)  # TODO allow multiple start positions
-        self.end_pos = self.map.getEndPos()
-        self.prevpos = ()
-        self.best_path = best_path
-        self.is_lost = False  # whether entity lost its path back to its start
+        self.end_pos = self.map.getEndPos() #the location of the target(s)
+        self.prevpos = ()  # The previous position of the entity
+        self.best_path = best_path # The best path that an entity has walked
+        self.is_lost = False  # Whether an entity lost its path back to its start
 
     def getEdges(self, i, j, edges, prevpos):
         returned_edges = {}

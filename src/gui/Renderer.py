@@ -54,7 +54,7 @@ class Renderer:
         self.rabbit_anim_frame_length = 1
 
         self.entity_move_frame = 0
-        self.entity_move_frames = 10
+        self.entity_move_frames = 20
 
         self._loadModels()
         self.question_mark = self._charTexFromPNG('?', color=(0, 255, 255))  # used for show entity is lost

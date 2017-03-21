@@ -123,6 +123,7 @@ class GUI:
         self.mainloop()  # start main loop
 
     def mainloop(self):
+        numberOfBunnies = 10
         while 1:
             self.clock.tick()
 
