@@ -1,6 +1,7 @@
 import math
 import os
 
+import OpenGL.arrays.vbo as glvbo
 import numpy
 from OpenGL.GLU import *
 
@@ -66,6 +67,67 @@ class Renderer:
         self.old_prop = None
         self.new_entity = None
 
+        # Set up shaders
+        self.data = numpy.array([
+            -1.0, 1.0, 0.0, 0, 1.0,
+            -1.0, -1.0, 0.0, 0, 0,
+            1.0, -1.0, 0.0, 1.0, 0,
+            1.0, 1.0, 0.0, 1.0, 1.0,
+        ], dtype=numpy.float32)
+
+        import OpenGL.GL as gl
+        def compile_vertex_shader(source):
+            """Compile a vertex shader from source."""
+            vertex_shader = gl.glCreateShader(gl.GL_VERTEX_SHADER)
+            gl.glShaderSource(vertex_shader, source)
+            gl.glCompileShader(vertex_shader)
+            # check compilation error
+            result = gl.glGetShaderiv(vertex_shader, gl.GL_COMPILE_STATUS)
+            if not (result):
+                raise RuntimeError(gl.glGetShaderInfoLog(vertex_shader))
+            return vertex_shader
+
+        def compile_fragment_shader(source):
+            """Compile a fragment shader from source."""
+            fragment_shader = gl.glCreateShader(gl.GL_FRAGMENT_SHADER)
+            gl.glShaderSource(fragment_shader, source)
+            gl.glCompileShader(fragment_shader)
+            # check compilation error
+            result = gl.glGetShaderiv(fragment_shader, gl.GL_COMPILE_STATUS)
+            if not (result):
+                raise RuntimeError(gl.glGetShaderInfoLog(fragment_shader))
+            return fragment_shader
+
+        def link_shader_program(vertex_shader, fragment_shader):
+            """Create a shader program with from compiled shaders."""
+            program = gl.glCreateProgram()
+            gl.glAttachShader(program, vertex_shader)
+            gl.glAttachShader(program, fragment_shader)
+            gl.glLinkProgram(program)
+            # check linking error
+            result = gl.glGetProgramiv(program, gl.GL_LINK_STATUS)
+            if not (result):
+                raise RuntimeError(gl.glGetProgramInfoLog(program))
+            return program
+
+        def initializeGL(self):
+            """Initialize OpenGL, VBOs, upload data on the GPU, etc."""
+            vertex_shader = open('gui/vertex_shader.vert.glsl').read()
+            blur_shader = open('gui/blur_shader2.frag.glsl').read()
+
+            # background color
+            gl.glClearColor(0, 0, 0, 0)
+            # create a Vertex Buffer Object with the specified data
+            self.vbo = glvbo.VBO(self.data)
+            # compile the vertex shader
+            vs = compile_vertex_shader(vertex_shader)
+            # compile the fragment shader
+            fs = compile_fragment_shader(blur_shader)
+            # compile the vertex shader
+            self.shaders_program = link_shader_program(vs, fs)
+
+        initializeGL(self)
+
         # Prepare grid
         self.grid = self._prepareGrid()
 
@@ -86,6 +148,8 @@ class Renderer:
         glEnable(GL_COLOR_MATERIAL)
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_SMOOTH)  # most obj files expect to be smooth-shaded
+
+        self.createFrameBuffer()
 
     def renderHUD(self, screen):
         glDisable(GL_DEPTH_TEST)
@@ -119,7 +183,136 @@ class Renderer:
 
         self._renderProps()
 
+    def renderMapUsingFBO(self):
+        self.renderMapToTexture()
+        self.renderMapTexture()
+
+    def createFrameBuffer(self):
+        # The framebuffer, which regroups 0, 1, or more textures, and 0 or 1 depth buffer.
+        self.FramebufferName = glGenFramebuffers(1, )
+        glBindFramebuffer(GL_FRAMEBUFFER, self.FramebufferName)
+
+        # The texture we're going to render to
+        renderedTexture = glGenTextures(1)
+
+        # "Bind" the newly created texture : all future texture functions will modify this texture
+        glBindTexture(GL_TEXTURE_2D, renderedTexture)
+
+        # Give an empty image to OpenGL ( the last "0" )
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, self.viewport[0], self.viewport[1], 0, GL_RGB, GL_UNSIGNED_BYTE, None)
+
+        # Poor filtering. Needed !
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        # We also need a depth buffer. This is optional, depending on what you actually need to draw in your texture but since we’re going to render Suzanne, we need depth-testing.
+
+        # The depth buffer
+        depthrenderbuffer = glGenRenderbuffers(1)
+        glBindRenderbuffer(GL_RENDERBUFFER, depthrenderbuffer)
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, self.viewport[0], self.viewport[1])
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthrenderbuffer)
+
+        # Finally, we configure our framebuffer
+
+        # Set "renderedTexture" as our colour attachment #0
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderedTexture, 0)
+
+        # Set the list of draw buffers.
+        DrawBuffers = [GL_COLOR_ATTACHMENT0]
+        glDrawBuffers(1, DrawBuffers)  # "1" is the size of DrawBuffers
+
+        # Something may have gone wrong during the process, depending on the capabilities of the GPU. This is how you check it :
+
+        # Always check that our framebuffer is ok
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE):
+            return False
+
+        self.maptex = renderedTexture
+
+    def renderMapToTexture(self):
+        glBindFramebuffer(GL_FRAMEBUFFER, self.FramebufferName)
+        glViewport(0, 0, self.viewport[0], self.viewport[1])
+        self.renderMap()
+
+    def renderMapTexture(self):
+        def paintGL(self):
+            """Paint the scene."""
+            # clear the buffer
+            # glClear(GL_COLOR_BUFFER_BIT)
+            # bind the VBO
+            self.vbo.bind()
+            # tell OpenGL that the VBO contains an array of vertices
+            # prepare the shader
+            positionAttrib = glGetAttribLocation(self.shaders_program, 'position')
+            coordsAttrib = glGetAttribLocation(self.shaders_program, 'texCoords')
+            resolutionUniform = glGetUniformLocation(self.shaders_program, 'iResolution')
+
+            glEnableVertexAttribArray(0)
+            glEnableVertexAttribArray(1)
+            # these vertices contain 2 single precision coordinates
+            glVertexAttribPointer(positionAttrib, 3, GL_FLOAT, GL_FALSE, 20, None)
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_TRUE, 20, ctypes.c_void_p(12))
+
+            self.texUnitUniform = glGetUniformLocation(self.shaders_program, 'iChannel0')
+            glUseProgram(self.shaders_program)
+            # draw "count" points from the VBO
+            # glDrawArrays(GL_LINE_STRIP, 0, len(self.data))
+
+            glUniform3f(resolutionUniform, 1280.0, 1024.0, 1.0)
+
+        paintGL(self)
+
+        # Render to the screen
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glViewport(0, 0, self.viewport[0], self.viewport[
+            1])  # Render on the whole framebuffer, complete from the lower left corner to the upper right
+
+        glDisable(GL_DEPTH_TEST)
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+
+        glDisable(GL_LIGHTING)
+        glEnable(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, self.maptex)
+        glUniform1i(self.texUnitUniform, 0)
+
+        glNormal3f(0.0, 0.0, 1.0)  # reset normal
+
+        # glBegin(GL_QUADS)
+        # glTexCoord2f(0, 0)
+        # glVertex2f(-1.0, -1.0)
+        # glTexCoord2f(1, 0)
+        # glVertex2f(1.0, -1.0)
+        # glTexCoord2f(1, 1)
+        # glVertex2f(1.0, 1.0)
+        # glTexCoord2f(0, 1)
+        # glVertex2f(-1.0, 1.0)
+        # glEnd()
+        glDrawArrays(GL_QUADS, 0, 4)
+
+        glBindTexture(GL_TEXTURE_2D, 0)
+        glDisable(GL_TEXTURE_2D)
+        glEnable(GL_LIGHTING)
+
+        glPopMatrix()
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glMatrixMode(GL_MODELVIEW)
+        glEnable(GL_DEPTH_TEST)
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+        self.vbo.unbind()
+        glUseProgram(0)
+        glDisableVertexAttribArray(0)
+        glDisableVertexAttribArray(1)
+
     def renderEntities(self, entities):
+        return
         """Renders all the entities."""
         self._resetCamera()
 
@@ -190,7 +383,7 @@ class Renderer:
                 glColor(0.95, 0.84, 0.62)
             elif entity.color == RabbitColor.ORANGE:
                 glColor(0.80, 0.39, 0.16)
-            glCallList(self.rabbit_models[self.rabbit_anim_frame].gl_list)
+            glCallList(self.rabbit_models[0].gl_list)  # TODO change back self.rabbit_anim_frame
             glScale(1 / scale, 1 / scale, 1 / scale)
 
             glTranslate(-dev_x, -dev_y, 0)
@@ -618,8 +811,9 @@ class Renderer:
 
         # Load entities
         os.chdir('rabbit/anim_run/')
-        for frame in range(self.rabbit_anim_frames):
-            self.rabbit_models.append(OBJ('rabbit_{0:06d}.obj'.format(frame), swapyz=True, monocolor=True))
+        # for frame in range(self.rabbit_anim_frames):
+        #     self.rabbit_models.append(OBJ('rabbit_{0:06d}.obj'.format(frame), swapyz=True, monocolor=True))
+        self.rabbit_models.append(OBJ('rabbit_000000.obj', swapyz=True, monocolor=True))  # TODO remove
         os.chdir('../../')
 
         os.chdir('../src/')
