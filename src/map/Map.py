@@ -51,7 +51,7 @@ class Map:
         tiles = [
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 1, 1, 1, 0, 1, 0],
-            [0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
             [0, 0, 1, 0, 1, 0, 0, 1, 0, 0],
             [0, 0, 1, 0, 0, 1, 0, 1, 0, 0],
@@ -69,7 +69,8 @@ class Map:
             Prop(2, 7, 270, PropModel.GREY_ROCK),
             Prop(3, 7, 270, PropModel.GREY_ROCK),
             Prop(5, 4, 270, PropModel.GREY_ROCK),
-            Prop(3, 7, 0, PropModel.TREE_LONG),
+            Prop(8, 2, 0, PropModel.TREE_LONG),
+            Prop(6, 2, 0, PropModel.TREE_LONG),
             Prop(4, 5, 0, PropModel.TREE_ORANGE),
             Prop(8, 7, 0, PropModel.TENT),
         ]
