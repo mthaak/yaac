@@ -49,16 +49,16 @@ class Map:
         self.size = (10, 10)
         self.current_map = 1
         tiles = [
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 0, 0, 0, 0, 1, 1],
-            [1, 0, 1, 1, 1, 1, 1, 0, 0, 1],
-            [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-            [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-            [1, 0, 1, 0, 0, 1, 1, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
-            [1, 1, 0, 0, 0, 1, 1, 0, 0, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 1, 1, 0, 1, 0],
+            [0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 1, 0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 0, 1, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
+            [0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         ]
         self.tiles = list(map(list, zip(*tiles)))  # transposed
 
@@ -67,10 +67,11 @@ class Map:
             Prop(8, 8, 0, PropModel.PLANT_1),  # end
             Prop(1, 7, 90, PropModel.GREY_ROCK),
             Prop(2, 7, 270, PropModel.GREY_ROCK),
-            Prop(2, 8, 270, PropModel.GREY_ROCK),
-            Prop(3, 8, 0, PropModel.TREE_LONG),
-            Prop(4, 8, 0, PropModel.TREE_ORANGE),
-            Prop(8, 2, 0, PropModel.TENT),
+            Prop(3, 7, 270, PropModel.GREY_ROCK),
+            Prop(5, 4, 270, PropModel.GREY_ROCK),
+            Prop(3, 7, 0, PropModel.TREE_LONG),
+            Prop(4, 5, 0, PropModel.TREE_ORANGE),
+            Prop(8, 7, 0, PropModel.TENT),
         ]
 
     def mediumMap(self):
@@ -122,6 +123,7 @@ class Map:
         ]
 
     def largeMap(self):
+        # Still TODO!
         self.start_pos = [(1, 1)]
         self.end_pos = [(8, 8)]
         self.size = (20, 20)
