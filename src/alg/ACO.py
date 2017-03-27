@@ -76,6 +76,44 @@ class ACO:
                 self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
                 self.edges[(i - 1, j, i, j, 90)] = [1, 0.1]
 
+    def fixEdgesHole(self, i, j, rotation):
+        """Fixes edges for a new hole."""
+        width, height = self.map.getSize()
+        edges = [
+            (i, j, i, j - 1, 0),
+            (i, j, i + 1, j, 90),
+            (i, j, i, j + 1, 180),
+            (i, j, i - 1, j, 270),
+            (i, j - 1, i, j, 180),
+            (i + 1, j, i, j, 270),
+            (i, j + 1, i, j, 0),
+            (i - 1, j, i, j, 90),
+        ]
+        for edge in edges:
+            try:
+                self.edges.pop(edge)
+            except KeyError:
+                pass
+
+        if not self.map.tileBlocked(i, j - 1) and j != 1 and rotation == 0:
+            self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
+            self.edges[(i, j - 1, i, j, 180)] = [1, 0.1]
+        elif not self.map.tileBlocked(i + 1, j) and i != width - 2 and rotation == 90:
+            self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+            self.edges[(i + 1, j, i, j, 270)] = [1, 0.1]
+        elif not self.map.tileBlocked(i, j + 1) and j != height - 2 and rotation == 180:
+            self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
+            self.edges[(i, j + 1, i, j, 0)] = [1, 0.1]
+        elif not self.map.tileBlocked(i - 1, j) and i != 1 and rotation == 270:
+            self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
+            self.edges[(i - 1, j, i, j, 90)] = [1, 0.1]
+
+    def tileOccupied(self, i, j):
+        for entity in self.entities:
+            if entity.i == i and entity.j == j:
+                return True
+        return False
+
     def generateEdges(self):
         """Generates all the edges based on the map."""
         edges = {}
@@ -92,6 +130,11 @@ class ACO:
                     edges[(i, j, i, j + 1, 180)] = [1, 0.1]
                 if not self.map.tileBlocked(i - 1, j) and i != 1:
                     edges[(i, j, i - 1, j, 270)] = [1, 0.1]
+                try:
+                    if self.map.getProp(i, j).model.name == 'HOLE':
+                        self.fixEdgesHole(i, j, self.map.getProp(i, j).r)
+                except:
+                    pass
         return edges
 
 
@@ -118,6 +161,7 @@ class Entity:
         self.prevpos = ()
         self.best_path = best_path
         self.is_lost = False  # whether entity lost its path back to its start
+        self.visited_edges = [(i, j)]
 
     def getEdges(self, i, j, edges, prevpos):
         returned_edges = {}
@@ -144,6 +188,15 @@ class Entity:
 
         if not returned_edges:
             returned_edges[prevpos] = edges[prevpos]
+
+        for edge in returned_edges:
+            # if the direction is the same, we give the edge a bonus
+            if edge[4] == self.orient:
+                returned_edges[edge][0] = +4
+
+            for i in self.visited_edges:
+                if i == (edge[3], edge[4]):
+                    returned_edges[edge][0] = returned_edges[edge][0] / 2
         # returned_edges[(0,1,0,1)] = edges[(0,1,0,1)] #replace with workable values
         return returned_edges
 
@@ -174,12 +227,69 @@ class Entity:
         new_path = (new_i, new_j, i, j, new_orientation)
         return new_path
 
+    # def straight_path(self, path): #returns the reversed path
+    #     a,b,c,d = path[0], path[1], path[2], path[3]
+    #     if a == c: # x axis
+    #         if b<d: #move down
+    #
+    #         else: #move up
+    #             if a<c: #move right
+    #
+    #             else: #move left
+    #     return new_path
+
     def updatePos(self):
         i, j = self.i, self.j
         usable_edges = self.getEdges(i, j, self.edges, self.prevpos)
 
         if self.type == 'rabbit':
-            if self.found_food == 1:  # FOOD IS FOUND, GO BACK TO STARTING POINT WHILE DROPPING PHEROMONES
+            if self.is_lost == 1:  # rabbit is lost
+                k = {}
+                p = {}
+                sum_pheromones = 0
+                sum_probability = 0
+                list_of_candidates = []
+                list_of_probabilities = []
+                for edge in usable_edges:  # this loop calculates the sum of weighted pheromones of all options
+                    k[edge] = usable_edges[edge]
+                    weighted_eta = (
+                                       1) ** self.alpha  # pheromone level is not taken into account in finding the way back
+                    weighted_pheromone = (k[edge][0]) ** self.beta
+                    sum_pheromones += (weighted_pheromone * weighted_eta)
+                    list_of_candidates.append(edge)
+                for edge in list_of_candidates:  # this loop calculates the probability of the entity taking an edge for every edge
+                    k[edge] = usable_edges[edge]
+                    weighted_eta = (1) ** self.alpha
+                    weighted_pheromone = (k[edge][0]) ** self.beta
+                    p[edge] = (weighted_pheromone * weighted_eta) / sum_pheromones
+                    list_of_probabilities.append(p[edge])
+
+                    sum_probability += p[edge]  # should be 1 in total
+
+                path = self.weighted_choice(p.items())
+                for edge in usable_edges:
+                    usable_edges[edge][0] = 1  # reset the heuristic data
+
+                reversed_path = self.reversed_path(path)
+                self.current_direction = path[4]
+                # print("path =%s" % str(path))
+
+                self.prevpos = (path[2], path[3], path[0], path[1], (path[4] + 180) % 360)
+                # path = numpy.random.choice(list_of_candidates, 1, list_of_probabilities) Doesn't work because a should be 1-dimensional
+                self.i, self.j, self.orient = path[2], path[3], path[4]  # pick new position randomly
+
+                newpos = (path[2], path[3])
+                self.visited_edges.append((path[2], path[3]))
+
+                if newpos in self.start_pos:
+                    self.is_lost = False
+                    self.visited_edges = [self.visited_edges[0]]
+                    self.step_count = 0
+                else:
+                    return True
+
+                return True
+            elif self.found_food == 1:  # FOOD IS FOUND, GO BACK TO STARTING POINT WHILE DROPPING PHEROMONES
                 path = self.way_back.pop()
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
@@ -187,6 +297,10 @@ class Entity:
                     self.edges[reversed_path][1] += self.pherodrop
                 except KeyError:  # probably an object was placed on reversed path
                     self.is_lost = True  # TODO have the entity actually be lost and having to find a way back to a home
+                    self.found_food = False
+                    self.visited_edges = [self.visited_edges[0]]
+                    self.way_back = []
+                    self.way = []
                 newpos = (path[2], path[3])
                 if newpos == self.start_pos:
                     self.found_food = 0
@@ -215,7 +329,11 @@ class Entity:
                     sum_probability += p[edge]  # should be 1 in total
 
                 path = self.weighted_choice(p.items())
+                for edge in usable_edges:
+                    usable_edges[edge][0] = 1  # reset the heuristic data
+
                 reversed_path = self.reversed_path(path)
+                self.current_direction = path[4]
                 self.way_back.append(reversed_path)  # path is prepended so it forms the way back (in reversed order)
                 self.way.append(path)
                 # print("path =%s" % str(path))
@@ -225,10 +343,12 @@ class Entity:
                 self.i, self.j, self.orient = path[2], path[3], path[4]  # pick new position randomly
 
                 newpos = (path[2], path[3])
+                self.visited_edges.append((path[2], path[3]))
 
                 if newpos in self.end_pos:
                     self.found_food = 1
                     path_length = len(self.way_back)
+                    self.visited_edges = [self.visited_edges[0]]
                     if path_length < self.best_path:
                         self.best_path = path_length
                 else:

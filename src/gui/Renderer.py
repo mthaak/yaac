@@ -6,6 +6,7 @@ import numpy
 from OpenGL.GLU import *
 
 from src.alg.ACO import RabbitColor
+from src.gui.Shader import Shader
 from src.gui.objloader import *
 from src.map.Map import *
 
@@ -24,15 +25,22 @@ class TileModel(Enum):
     RIVER_JUNCTION_DIRT = 'naturepack_extended/Models/naturePack_147.obj'
 
 
+class LayerType(Enum):
+    TILES = 1
+    FLOOR = 2
+    PROPS_ENTITIES = 3
+
+
 class Renderer:
     def __init__(self, viewport, map, alg):
         self.viewport = viewport
         self.map = map
         self.alg = alg
+        self.shader = Shader()
 
         # OPTIONS
         self.show_grid = False
-        self.show_edges = True
+        self.show_edges = False
 
         width, height = map.getSize()
         self.center_x = width / 2 * 3
@@ -40,7 +48,7 @@ class Renderer:
         self.phi, self.theta = 90, 350  # used for camera position
         self.zpos = 15  # camera zoom
 
-        self.background = self._texFromPNG('res/background.png')
+        self.background = self._texFromPNG('res/sky.png')
 
         self.tile_models = {}
         self.tile_models_mono = {}  # monocolored tiles
@@ -67,69 +75,14 @@ class Renderer:
         self.old_prop = None
         self.new_entity = None
 
-        # Set up shaders
+        # Set up data for texture layers
         self.data = numpy.array([
             -1.0, 1.0, 0.0, 0, 1.0,
             -1.0, -1.0, 0.0, 0, 0,
             1.0, -1.0, 0.0, 1.0, 0,
             1.0, 1.0, 0.0, 1.0, 1.0,
         ], dtype=numpy.float32)
-
-        import OpenGL.GL as gl
-        def compile_vertex_shader(source):
-            """Compile a vertex shader from source."""
-            vertex_shader = gl.glCreateShader(gl.GL_VERTEX_SHADER)
-            gl.glShaderSource(vertex_shader, source)
-            gl.glCompileShader(vertex_shader)
-            # check compilation error
-            result = gl.glGetShaderiv(vertex_shader, gl.GL_COMPILE_STATUS)
-            if not (result):
-                raise RuntimeError(gl.glGetShaderInfoLog(vertex_shader))
-            return vertex_shader
-
-        def compile_fragment_shader(source):
-            """Compile a fragment shader from source."""
-            fragment_shader = gl.glCreateShader(gl.GL_FRAGMENT_SHADER)
-            gl.glShaderSource(fragment_shader, source)
-            gl.glCompileShader(fragment_shader)
-            # check compilation error
-            result = gl.glGetShaderiv(fragment_shader, gl.GL_COMPILE_STATUS)
-            if not (result):
-                raise RuntimeError(gl.glGetShaderInfoLog(fragment_shader))
-            return fragment_shader
-
-        def link_shader_program(vertex_shader, fragment_shader):
-            """Create a shader program with from compiled shaders."""
-            program = gl.glCreateProgram()
-            gl.glAttachShader(program, vertex_shader)
-            gl.glAttachShader(program, fragment_shader)
-            gl.glLinkProgram(program)
-            # check linking error
-            result = gl.glGetProgramiv(program, gl.GL_LINK_STATUS)
-            if not (result):
-                raise RuntimeError(gl.glGetProgramInfoLog(program))
-            return program
-
-        def initializeGL(self):
-            """Initialize OpenGL, VBOs, upload data on the GPU, etc."""
-            vertex_shader = open('gui/vertex_shader.vert.glsl').read()
-            blur_shader = open('gui/blur_shader2.frag.glsl').read()
-
-            # background color
-            gl.glClearColor(0, 0, 0, 0)
-            # create a Vertex Buffer Object with the specified data
-            self.vbo = glvbo.VBO(self.data)
-            # compile the vertex shader
-            vs = compile_vertex_shader(vertex_shader)
-            # compile the fragment shader
-            fs = compile_fragment_shader(blur_shader)
-            # compile the vertex shader
-            self.shaders_program = link_shader_program(vs, fs)
-
-        initializeGL(self)
-
-        # Prepare grid
-        self.grid = self._prepareGrid()
+        self.vbo = glvbo.VBO(self.data)
 
         # Set initial view settings
         glMatrixMode(GL_PROJECTION)
@@ -138,6 +91,7 @@ class Renderer:
         gluPerspective(90.0, width / float(height), 1, 100.0)
         glEnable(GL_DEPTH_TEST)
         glMatrixMode(GL_MODELVIEW)
+        glViewport(0, 0, self.viewport[0], self.viewport[1])
 
         # Initialise OpenGL settings
         glLightfv(GL_LIGHT0, GL_POSITION, (-40, 200, 100, 0.0))
@@ -149,62 +103,121 @@ class Renderer:
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_SMOOTH)  # most obj files expect to be smooth-shaded
 
-        self.createFrameBuffer()
+        self.num_blur_layers = 5
+        # Tile layers + grid layer + edges layer + prop layers
+        self.num_layers = self.num_blur_layers + 2 + self.num_blur_layers
+        self.grid_layer = self.num_blur_layers
+        self.edges_layer = self.num_blur_layers + 1
+        self.framebuffer, self.layers = self._createFrameBuffer(self.num_layers)
+        self.current_layer = 0  # user for decreasing number of layer changes
+
+        # Prepare grid layer
+        # self._renderGrid() TODO fix
 
     def renderHUD(self, screen):
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
         glDisable(GL_DEPTH_TEST)
+        # glMatrixMode(GL_PROJECTION)
+        # glPushMatrix()
+        # glLoadIdentity()
+        # glMatrixMode(GL_MODELVIEW)
+        # glPushMatrix()
         glLoadIdentity()
+
         screen.display()
+
+        # glPopMatrix()
+        # glMatrixMode(GL_PROJECTION)
+        # glPopMatrix()
+        # glMatrixMode(GL_MODELVIEW)
         glEnable(GL_DEPTH_TEST)
 
-    def renderMap(self, selectedTile=None, selectedProp=None, redProp=None, greenProp=None):
-        """Renders the complete map."""
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    def renderLayers(self, selectedTile=None, selectedProp=None, redProp=None, greenProp=None):
+        """Renders all the layers."""
+        glEnable(GL_DEPTH_TEST)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer)
+        glViewport(0, 0, self.viewport[0], self.viewport[1])
+
+        # Clear layers
+        for i in range(self.num_layers):
+            self._changeLayer(i)
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
         glColor(1.0, 1.0, 1.0)
-        glBindTexture(GL_TEXTURE_2D, 0)  # unbind previous texture
+        glBindTexture(GL_TEXTURE_2D, 0)
 
-        self._renderBackground()
+        glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer)
 
-        self._resetCamera()
+        if self.show_edges:
+            self._renderEdges()
 
         self._renderTiles(select=selectedTile)
 
-        self._resetCamera()
-
-        if self.show_grid:
-            self._resetCamera()
-            glCallList(self.grid)
-
-        if self.show_edges:
-            self._resetCamera()
-            self._renderEdges()
-
-        self._resetCamera()
-
         self._renderProps()
 
-    def renderMapUsingFBO(self):
-        self.renderMapToTexture()
-        self.renderMapTexture()
+        self._renderEntities()
 
-    def createFrameBuffer(self):
-        # The framebuffer, which regroups 0, 1, or more textures, and 0 or 1 depth buffer.
-        self.FramebufferName = glGenFramebuffers(1, )
-        glBindFramebuffer(GL_FRAMEBUFFER, self.FramebufferName)
+    def render(self):
+        self.renderLayers()
+        self._draw()
 
-        # The texture we're going to render to
-        renderedTexture = glGenTextures(1)
+    def isAnimationDone(self):
+        return self.entity_move_frame == 0
 
-        # "Bind" the newly created texture : all future texture functions will modify this texture
-        glBindTexture(GL_TEXTURE_2D, renderedTexture)
+    def getTileCoords(self, x, y):
+        """Gets the tile coordinates (i,j) for the tile under screen coordinates x, y."""
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self._resetCamera()
+        self._renderTiles(pick=True)
+        color = tuple(glReadPixels(x, self.viewport[1] - y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE))
+        if color in list(self.colorToTile.keys()):
+            return self.colorToTile[color]
+        else:  # tile not found
+            return None
 
-        # Give an empty image to OpenGL ( the last "0" )
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, self.viewport[0], self.viewport[1], 0, GL_RGB, GL_UNSIGNED_BYTE, None)
+    def getPropCoords(self, x, y):
+        """Gets the prop coordinates (i,j) for the prop under screen coordinates x, y."""
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self._resetCamera()
+        self._renderProps(pick=True)
+        color = tuple(glReadPixels(x, self.viewport[1] - y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE))
+        if color in list(self.colorToProp.keys()):
+            return self.colorToProp[color]
+        else:  # prop not found
+            return None
 
-        # Poor filtering. Needed !
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        # We also need a depth buffer. This is optional, depending on what you actually need to draw in your texture but since we’re going to render Suzanne, we need depth-testing.
+    def toggleShowGrid(self):
+        self.show_grid = not self.show_grid
+        glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer)
+        # self._renderGrid()
+
+    def toggleShowEdges(self):
+        self.show_edges = not self.show_edges
+
+    def mapSizeChanged(self):
+        glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer)
+        # self._renderGrid()
+
+    def _createFrameBuffer(self, num_layers=1):
+        framebuffer = glGenFramebuffers(1)
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer)
+
+        # Create layers
+        layers = []
+        for _ in range(num_layers):
+            texture = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_2D, texture)
+
+            # Give an empty image to OpenGL
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self.viewport[0], self.viewport[1], 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                         None)
+
+            # Poor filtering. Needed !
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+            layers.append(texture)
 
         # The depth buffer
         depthrenderbuffer = glGenRenderbuffers(1)
@@ -212,55 +225,52 @@ class Renderer:
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, self.viewport[0], self.viewport[1])
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthrenderbuffer)
 
-        # Finally, we configure our framebuffer
-
-        # Set "renderedTexture" as our colour attachment #0
-        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderedTexture, 0)
+        # Set colour attachment #0
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, layers[0], 0)
 
         # Set the list of draw buffers.
-        DrawBuffers = [GL_COLOR_ATTACHMENT0]
-        glDrawBuffers(1, DrawBuffers)  # "1" is the size of DrawBuffers
-
-        # Something may have gone wrong during the process, depending on the capabilities of the GPU. This is how you check it :
+        glDrawBuffers(1, [GL_COLOR_ATTACHMENT0])
 
         # Always check that our framebuffer is ok
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE):
+        if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
             return False
 
-        self.maptex = renderedTexture
+        return framebuffer, layers
 
-    def renderMapToTexture(self):
-        glBindFramebuffer(GL_FRAMEBUFFER, self.FramebufferName)
-        glViewport(0, 0, self.viewport[0], self.viewport[1])
-        self.renderMap()
+    def _resetCamera(self):
+        """Sets the view such that it looks at the center of the map from the sky."""
+        glLoadIdentity()
+        width, height = self.map.getSize()
+        self.center_x = 3 * width / 2
+        self.center_y = -3 * height / 2
+        self.center_z = 0.3
+        to_rad = (math.pi / 180)
+        self.cam_x = self.center_x + self.zpos * math.cos(self.phi * to_rad) * math.sin(self.theta * to_rad)
+        self.cam_y = self.center_y + self.zpos * math.sin(self.phi * to_rad) * math.sin(self.theta * to_rad)
+        self.cam_z = self.center_z + self.zpos * math.cos(self.theta * to_rad)
+        # Set the camera position and look at point
+        gluLookAt(self.cam_x, self.cam_y, self.cam_z,  # camera position
+                  self.center_x, self.center_y, self.center_z,  # look at point
+                  0.0, 0.0, 1.0)  # up vector
 
-    def renderMapTexture(self):
-        def paintGL(self):
-            """Paint the scene."""
-            # clear the buffer
-            # glClear(GL_COLOR_BUFFER_BIT)
-            # bind the VBO
-            self.vbo.bind()
-            # tell OpenGL that the VBO contains an array of vertices
-            # prepare the shader
-            positionAttrib = glGetAttribLocation(self.shaders_program, 'position')
-            coordsAttrib = glGetAttribLocation(self.shaders_program, 'texCoords')
-            resolutionUniform = glGetUniformLocation(self.shaders_program, 'iResolution')
+    def _draw(self):
+        self.vbo.bind()
+        # tell OpenGL that the VBO contains an array of vertices
+        # prepare the shader
+        positionAttrib = glGetAttribLocation(self.shader.blur_program, 'position')
+        coordsAttrib = glGetAttribLocation(self.shader.blur_program, 'texCoords')
+        res_uniform = glGetUniformLocation(self.shader.blur_program, 'iResolution')
+        radiusUniform = glGetUniformLocation(self.shader.blur_program, 'radius')
 
-            glEnableVertexAttribArray(0)
-            glEnableVertexAttribArray(1)
-            # these vertices contain 2 single precision coordinates
-            glVertexAttribPointer(positionAttrib, 3, GL_FLOAT, GL_FALSE, 20, None)
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_TRUE, 20, ctypes.c_void_p(12))
+        glEnableVertexAttribArray(0)
+        glEnableVertexAttribArray(1)
+        # these vertices contain 2 single precision coordinates
+        glVertexAttribPointer(positionAttrib, 3, GL_FLOAT, GL_FALSE, 20, None)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_TRUE, 20, ctypes.c_void_p(12))
 
-            self.texUnitUniform = glGetUniformLocation(self.shaders_program, 'iChannel0')
-            glUseProgram(self.shaders_program)
-            # draw "count" points from the VBO
-            # glDrawArrays(GL_LINE_STRIP, 0, len(self.data))
-
-            glUniform3f(resolutionUniform, 1280.0, 1024.0, 1.0)
-
-        paintGL(self)
+        tex_uniform = glGetUniformLocation(self.shader.blur_program, 'iChannel0')
+        fg_uniform = glGetUniformLocation(self.shader.blur_program, 'foregroundTexture')
+        use_fg_uniform = glGetUniformLocation(self.shader.blur_program, 'useFG')
 
         # Render to the screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
@@ -277,24 +287,66 @@ class Renderer:
 
         glDisable(GL_LIGHTING)
         glEnable(GL_TEXTURE_2D)
-        glBindTexture(GL_TEXTURE_2D, self.maptex)
-        glUniform1i(self.texUnitUniform, 0)
-
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glNormal3f(0.0, 0.0, 1.0)  # reset normal
 
-        # glBegin(GL_QUADS)
-        # glTexCoord2f(0, 0)
-        # glVertex2f(-1.0, -1.0)
-        # glTexCoord2f(1, 0)
-        # glVertex2f(1.0, -1.0)
-        # glTexCoord2f(1, 1)
-        # glVertex2f(1.0, 1.0)
-        # glTexCoord2f(0, 1)
-        # glVertex2f(-1.0, 1.0)
-        # glEnd()
+        glUseProgram(self.shader.normal_program)
+
+        glBindTexture(GL_TEXTURE_2D, self.background)
         glDrawArrays(GL_QUADS, 0, 4)
 
+        max_radius = 10
+        step_radius = max_radius / (self.num_blur_layers - 1)
+
+        glUseProgram(self.shader.blur_program)
+        glUniform3f(res_uniform, self.viewport[0], self.viewport[1], 1.0)
+        glUniform1i(tex_uniform, 0)
+        glUniform1i(fg_uniform, 1)
+
+        glUseProgram(self.shader.blur_program)
+
+        # Draw tile layers
+        for i in range(0, self.num_blur_layers):
+            center_i = int(self.num_blur_layers / 2)
+            radius = abs(center_i - i) * step_radius
+            glUniform1f(radiusUniform, radius)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, self.layers[i])
+            if i < self.num_blur_layers - 1:
+                glUniform1f(use_fg_uniform, True)
+                glActiveTexture(GL_TEXTURE1)
+                glBindTexture(GL_TEXTURE_2D, self.layers[i + 1])
+            else:
+                glUniform1f(use_fg_uniform, False)
+            glDrawArrays(GL_QUADS, 0, 4)
+        glActiveTexture(GL_TEXTURE0)
+
+        # glUseProgram(self.shader.normal_program)
+        #
+        # if self.show_grid:
+        #     glBindTexture(GL_TEXTURE_2D, self.grid_layer)
+        #     glDrawArrays(GL_QUADS, 0, 4)
+        #
+        # if self.show_edges:
+        #     glBindTexture(GL_TEXTURE_2D, self.edges_layer)
+        #     glDrawArrays(GL_QUADS, 0, 4)
+
+        glUseProgram(self.shader.blur_program)
+
+        # Draw prop layers (with entities)
+        glUniform1f(use_fg_uniform, False)
+        for i in range(self.num_blur_layers + 1, self.num_layers):
+            center_i = self.num_blur_layers + 2 + int(self.num_blur_layers / 2)
+            radius = abs(center_i - i) * step_radius
+            glUniform1f(radiusUniform, radius)
+            glBindTexture(GL_TEXTURE_2D, self.layers[i])
+            glDrawArrays(GL_QUADS, 0, 4)
+
+        glUseProgram(0)
+
         glBindTexture(GL_TEXTURE_2D, 0)
+        glDisable(GL_BLEND)
         glDisable(GL_TEXTURE_2D)
         glEnable(GL_LIGHTING)
 
@@ -304,28 +356,259 @@ class Renderer:
         glMatrixMode(GL_MODELVIEW)
         glEnable(GL_DEPTH_TEST)
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindVertexArray(0)
         self.vbo.unbind()
-        glUseProgram(0)
+        glBindVertexArray(0)
         glDisableVertexAttribArray(0)
         glDisableVertexAttribArray(1)
 
-    def renderEntities(self, entities):
-        return
-        """Renders all the entities."""
+    def _renderGrid(self):
+        """Prepares a display list for the grid."""
+        # Load textures for characters
+        chars = '0123456789,'
+        # chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz' \
+        #         '0123456789 !@#$%^&*()-=_+\|[]{};:\'",.<>/?`~'
+        char_textures = {}
+        for char in chars:
+            char_textures[char] = self._charTexFromPNG(char)
+        x_dev, y_dev = 2.3, 2.3
+        width, height = self.map.getSize()
+
+        self._changeLayer(self.grid_layer)
+
         self._resetCamera()
 
+        glLineWidth(1.0)
+        glColor3f(1.0, 0.0, 0.0)
+        # Draw grid
+        glBegin(GL_LINES)
+        for i in range(1, width):
+            glVertex3f(3 * i, -y_dev, 0.32)
+            glVertex3f(3 * i, -3 * height + y_dev, 0.32)
+        for j in range(1, height):
+            glVertex3f(x_dev, -3 * j, 0.32)
+            glVertex3f(3 * width - x_dev, -3 * j, 0.32)
+        glEnd()
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        # Draw coordinates of grid cells
+        char_width, char_height, margin = 0.6, 0.6, 0.1
+        for i in range(0, width):
+            for j in range(0, height):
+                string = '{0},{1}'.format(i, j)
+                for k, c in enumerate(string):
+                    glBindTexture(GL_TEXTURE_2D, char_textures[c])
+                    glBegin(GL_QUADS)
+                    glTexCoord2f(0, 0)
+                    glVertex3f(3 * i + margin + char_width * k, -3 * j - margin, 0.32)
+                    glTexCoord2f(1, 0)
+                    glVertex3f(3 * i + margin + char_width + char_width * k, -3 * j - margin, 0.32)
+                    glTexCoord2f(1, 1)
+                    glVertex3f(3 * i + margin + char_width + char_width * k, -3 * j - margin - char_height, 0.32)
+                    glTexCoord2f(0, 1)
+                    glVertex3f(3 * i + margin + char_width * k, -3 * j - margin - char_height, 0.32)
+                    glEnd()
+        glBindTexture(GL_TEXTURE_2D, 0)
+        glDisable(GL_BLEND)
+        glDisable(GL_TEXTURE_2D)
+
+    def _renderEdges(self):
+        edges = self.alg.edges
+
+        self._changeLayer(4)  # TODO fix hack
+
+        self._resetCamera()
+
+        glLineWidth(1.0)
+        glDisable(GL_LIGHTING)
+        glBegin(GL_LINES)
+        for (i, j, idest, jdest, r) in edges.keys():
+            phero = edges[(i, j, idest, jdest, r)][1]
+            glColor3f(0.015, phero, phero)  # 0.015 is chosen to distinguish the edge
+            if not edges[(idest, jdest, i, j, (r + 180) % 360)][1] > phero:  # prevent draw in both directions
+                glVertex3f(3 * i + 1.5, -3 * j - 1.5, 0.35)
+                glVertex3f(3 * (i + idest) / 2 + 1.5, -3 * (j + jdest) / 2 - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * (i + idest) / 2 + 1.5, -3 * (j + jdest) / 2 - 1.5, 0.35)
+            if r == 0:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
+            if r == 90:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
+            if r == 180:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
+            if r == 270:
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
+                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
+                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
+        glEnd()
+        glEnable(GL_LIGHTING)
+
+    def _renderTiles(self, select=None, pick=False):
+        """Renders the tiles.
+        :type select: tuple (i,j), the selected tile
+        :type pick: boolean, whether a tile was picked so that every tile should get a different color
+        """
+        self._resetCamera()
+
+        if pick:
+            glDisable(GL_TEXTURE_2D)
+            glDisable(GL_LIGHTING)
+            self.colorToTile = {}
+
+        glDisable(GL_CULL_FACE)
+
+        width, height = self.map.getSize()
+        for j in range(height):
+            for i in range(width):
+                # Determine tile model id and orientation
+                model_id, orientation = self._getTile(i, j)
+                glRotate(-orientation, 0, 0, 1)
+                if orientation == 90 or orientation == 180:
+                    glTranslate(0, 3, 0)
+                if orientation == 180 or orientation == 270:
+                    glTranslate(-3, 0, 0)
+
+                if model_id == TileModel.CLIFF_TOP_DIRT \
+                        or model_id == TileModel.CLIFF_TOP_WATERFALL_DIRT:  # the cliff edges have a deviation
+                    glTranslate(2.5, 0, 0.01)
+
+                if model_id == TileModel.CLIFF_TOP_CORNER_DIRT:  # the cliff corners have a deviation as well
+                    glTranslate(2.08, 0, 0.01)
+
+                if pick:
+                    color = (int(i / width * 255), int(j / height * 255), 255)
+                    glColor3ub(*color)
+                    self.colorToTile[color] = (i, j)
+                    glCallList(self.tile_models_mono[model_id].gl_list)  # draw mono tile model
+                elif select == (i, j):
+                    glDisable(GL_LIGHTING)  # so that tile gets a slightly different shade (depends on angle though)
+                    glCallList(self.tile_models[model_id].gl_list)  # draw tile model
+                    glEnable(GL_LIGHTING)
+                else:
+                    x, y, z = 3 * i, -3 * j, 0
+                    layer = self._determineLayer(LayerType.TILES, x, y, z)
+                    self._changeLayer(layer)
+                    glCallList(self.tile_models[model_id].gl_list)  # draw tile model
+
+                if model_id == TileModel.CLIFF_TOP_DIRT \
+                        or model_id == TileModel.CLIFF_TOP_WATERFALL_DIRT:  # the edges have a deviation
+                    glTranslate(-2.5, 0, -0.01)
+
+                if model_id == TileModel.CLIFF_TOP_CORNER_DIRT:  # the cliff corners have a deviation as well
+                    glTranslate(-2.08, 0, -0.01)
+
+                if orientation == 90 or orientation == 180:
+                    glTranslate(0, -3, 0)
+                if orientation == 180 or orientation == 270:
+                    glTranslate(3, 0, 0)
+                glRotate(orientation, 0, 0, 1)
+
+                glTranslate(3, 0, 0)
+            glTranslate(-3 * width, -3, 0)
+
+        if pick:
+            glEnable(GL_LIGHTING)
+            glEnable(GL_TEXTURE_2D)
+
+    def _renderProps(self, pick=False):
+        self._resetCamera()
+
+        props = self.map.getProps()
+        if self.move_prop and type(self.move_prop) == Prop:
+            selected_prop = [self.move_prop]
+        else:
+            selected_prop = []
+        if self.new_prop:
+            new_prop = [self.new_prop]
+        else:
+            new_prop = []
+
+        if pick:
+            glDisable(GL_TEXTURE_2D)
+            glDisable(GL_LIGHTING)
+            self.colorToProp = {}
+
+        width, height = self.map.getSize()
+        for prop in props + selected_prop + new_prop:
+            if prop.i < 0 or prop.j < 0:  # not allowed
+                continue
+
+            dx, dy = self.prop_models_mono[prop.model].dx, self.prop_models_mono[prop.model].dy
+            x, y, z = 3 * prop.i, -3 * prop.j, 0.3
+
+            glTranslate(x + 0.5 * (3 - dx), y - 0.5 * (3 - dy), z)
+            glRotate(-prop.r, 0, 0, 1)
+            if prop.r == 90 or prop.r == 180:
+                glTranslate(0, dx, 0)
+            if prop.r == 180 or prop.r == 270:
+                glTranslate(-dy, 0, 0)
+
+            if pick:
+                color = (int(prop.i / width * 255), int(prop.j / height * 255), 255)
+                glColor3ub(*color)
+                self.colorToProp[color] = (prop.i, prop.j)
+                glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
+            else:
+                layer = self._determineLayer(LayerType.PROPS_ENTITIES, x, y, z)
+                self._changeLayer(layer)
+                if self.move_prop and \
+                        ((type(self.move_prop) == tuple
+                          and prop.i == self.move_prop[0] and prop.j == self.move_prop[1])
+                         or (type(self.move_prop) == Prop
+                             and prop.i == self.move_prop.i and prop.j == self.move_prop.j)):
+                    glColor3f(1.0, 1.0, 1.0)
+                    glCallList(self.prop_models_mono[prop.model].gl_list)  # draw prop model
+                elif self.new_prop and prop.i == self.new_prop.i and prop.j == self.new_prop.j:
+                    glColor3f(0.0, 1.0, 0.0)
+                    glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
+                elif self.old_prop and prop.i == self.old_prop[0] and prop.j == self.old_prop[1]:
+                    glColor3f(1.0, 0.0, 0.0)
+                    glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
+                else:
+                    glCallList(self.prop_models[prop.model].gl_list)  # draw prop model
+
+            if prop.r == 90 or prop.r == 180:
+                glTranslate(0, -dx, 0)
+            if prop.r == 180 or prop.r == 270:
+                glTranslate(dy, 0, 0)
+            glRotate(prop.r, 0, 0, 1)
+
+            glTranslate(-3 * prop.i - 0.5 * (3 - dx), 3 * prop.j + 0.5 * (3 - dy), -0.3)
+
+        if pick:
+            glEnable(GL_LIGHTING)
+            glEnable(GL_TEXTURE_2D)
+
+    def _renderEntities(self):
+        """Renders all the entities."""
+        entities = self.alg.getEntities()
         if self.new_entity:
             new_entity = [self.new_entity]
         else:
             new_entity = []
+
+        self._resetCamera()
 
         scale = 0.05
         dev_x, dev_y = 1.5, -1.5
         for i, entity in enumerate(entities + new_entity):
             if entity.i < 0 or entity.j < 0:  # not allowed
                 continue
+
+            x, y, z = 3 * entity.i, -3 * entity.j, 0
+            layer = self._determineLayer(LayerType.TILES, x, y, z)
+            self._changeLayer(layer)
 
             glTranslate(3 * entity.i, -3 * entity.j, 0.25)
 
@@ -405,305 +688,6 @@ class Renderer:
             self.rabbit_anim_counter = 0
 
         self.entity_move_frame = (self.entity_move_frame + 1) % self.entity_move_frames
-
-        return self.entity_move_frame == 0
-
-    def getTileCoords(self, x, y):
-        """Gets the tile coordinates (i,j) for the tile under screen coordinates x, y."""
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self._resetCamera()
-        self._renderTiles(pick=True)
-        color = tuple(glReadPixels(x, self.viewport[1] - y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE))
-        if color in list(self.colorToTile.keys()):
-            return self.colorToTile[color]
-        else:  # tile not found
-            return None
-
-    def getPropCoords(self, x, y):
-        """Gets the prop coordinates (i,j) for the prop under screen coordinates x, y."""
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self._resetCamera()
-        self._renderProps(pick=True)
-        color = tuple(glReadPixels(x, self.viewport[1] - y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE))
-        if color in list(self.colorToProp.keys()):
-            return self.colorToProp[color]
-        else:  # prop not found
-            return None
-
-    def _resetCamera(self):
-        """Sets the view such that it looks at the center of the map from the sky."""
-        glLoadIdentity()
-        self.center_x = 5.5 * 3
-        self.center_y = -4 * 3
-        self.center_z = 0
-        to_rad = (math.pi / 180)
-        cam_x = self.center_x + self.zpos * math.cos(self.phi * to_rad) * math.sin(self.theta * to_rad)
-        cam_y = self.center_y + self.zpos * math.sin(self.phi * to_rad) * math.sin(self.theta * to_rad)
-        cam_z = self.center_z + self.zpos * math.cos(self.theta * to_rad)
-        # Set the camera position and look at point
-        gluLookAt(cam_x, cam_y, cam_z,  # camera position
-                  self.center_x, self.center_y, self.center_z,  # look at point
-                  0.0, 0.0, 1.0)  # up vector
-
-    def _prepareGrid(self):
-        """Prepares a display list for the grid."""
-        # Load textures for characters
-        chars = '0123456789,'
-        # chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz' \
-        #         '0123456789 !@#$%^&*()-=_+\|[]{};:\'",.<>/?`~'
-        char_textures = {}
-        for char in chars:
-            char_textures[char] = self._charTexFromPNG(char)
-
-        # Create display list
-        dplist = glGenLists(1)
-        glNewList(dplist, GL_COMPILE)
-
-        glLineWidth(1.0)
-        glColor3f(1.0, 0.0, 0.0)
-        x_dev, y_dev = 2.3, 2.3
-
-        width, height = self.map.getSize()
-
-        # Draw grid
-        glBegin(GL_LINES)
-        for i in range(1, width):
-            glVertex3f(3 * i, -y_dev, 0.32)
-            glVertex3f(3 * i, -3 * height + y_dev, 0.32)
-        for j in range(1, height):
-            glVertex3f(x_dev, -3 * j, 0.32)
-            glVertex3f(3 * width - x_dev, -3 * j, 0.32)
-        glEnd()
-
-        glColor(1.0, 1.0, 1.0)
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        # Draw coordinates of grid cells
-        char_width, char_height, margin = 0.6, 0.6, 0.1
-        for i in range(0, width):
-            for j in range(0, height):
-                string = '{0},{1}'.format(i, j)
-                for k, c in enumerate(string):
-                    glBindTexture(GL_TEXTURE_2D, char_textures[c])
-                    glBegin(GL_QUADS)
-                    glTexCoord2f(0, 0)
-                    glVertex3f(3 * i + margin + char_width * k, -3 * j - margin, 0.32)
-                    glTexCoord2f(1, 0)
-                    glVertex3f(3 * i + margin + char_width + char_width * k, -3 * j - margin, 0.32)
-                    glTexCoord2f(1, 1)
-                    glVertex3f(3 * i + margin + char_width + char_width * k, -3 * j - margin - char_height, 0.32)
-                    glTexCoord2f(0, 1)
-                    glVertex3f(3 * i + margin + char_width * k, -3 * j - margin - char_height, 0.32)
-                    glEnd()
-
-        glDisable(GL_BLEND)
-        glDisable(GL_TEXTURE_2D)
-
-        glEndList()
-        return dplist
-
-    def _renderBackground(self):
-        """Renders the background."""
-        glDisable(GL_DEPTH_TEST)
-        glMatrixMode(GL_PROJECTION)
-        glPushMatrix()
-        glLoadIdentity()
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
-
-        glDisable(GL_LIGHTING)
-        glEnable(GL_TEXTURE_2D)
-        glBindTexture(GL_TEXTURE_2D, self.background)
-
-        glNormal3f(0.0, 0.0, 1.0)  # reset normal
-
-        glBegin(GL_QUADS)
-        glTexCoord2f(0, 0)
-        glVertex2f(-1.0, -1.0)
-        glTexCoord2f(1, 0)
-        glVertex2f(1.0, -1.0)
-        glTexCoord2f(1, 1)
-        glVertex2f(1.0, 1.0)
-        glTexCoord2f(0, 1)
-        glVertex2f(-1.0, 1.0)
-        glEnd()
-
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glDisable(GL_TEXTURE_2D)
-        glEnable(GL_LIGHTING)
-
-        glPopMatrix()
-        glMatrixMode(GL_PROJECTION)
-        glPopMatrix()
-        glMatrixMode(GL_MODELVIEW)
-        glEnable(GL_DEPTH_TEST)
-
-    def _renderTiles(self, select=None, pick=False):
-        """Renders the tiles.
-        :type select: tuple (i,j), the selected tile
-        :type pick: boolean, whether a tile was picked so that every tile should get a different color
-        """
-        if pick:
-            glDisable(GL_TEXTURE_2D)
-            glDisable(GL_LIGHTING)
-            self.colorToTile = {}
-
-        width, height = self.map.getSize()
-        for j in range(height):
-            for i in range(width):
-                # Determine tile model id and orientation
-                model_id, orientation = self._getTile(i, j)
-                glRotate(-orientation, 0, 0, 1)
-                if orientation == 90 or orientation == 180:
-                    glTranslate(0, 3, 0)
-                if orientation == 180 or orientation == 270:
-                    glTranslate(-3, 0, 0)
-
-                if model_id == TileModel.CLIFF_TOP_DIRT \
-                        or model_id == TileModel.CLIFF_TOP_WATERFALL_DIRT:  # the cliff edges have a deviation
-                    glTranslate(2.5, 0, 0.01)
-
-                if model_id == TileModel.CLIFF_TOP_CORNER_DIRT:  # the cliff corners have a deviation as well
-                    glTranslate(2.08, 0, 0.01)
-
-                if pick:
-                    color = (int(i / width * 255), int(j / height * 255), 255)
-                    glColor3ub(*color)
-                    self.colorToTile[color] = (i, j)
-                    glCallList(self.tile_models_mono[model_id].gl_list)  # draw mono tile model
-                elif select == (i, j):
-                    glDisable(GL_LIGHTING)  # so that tile gets a slightly different shade (depends on angle though)
-                    glCallList(self.tile_models[model_id].gl_list)  # draw tile model
-                    glEnable(GL_LIGHTING)
-                else:
-                    glCallList(self.tile_models[model_id].gl_list)  # draw tile model
-
-                if model_id == TileModel.CLIFF_TOP_DIRT \
-                        or model_id == TileModel.CLIFF_TOP_WATERFALL_DIRT:  # the edges have a deviation
-                    glTranslate(-2.5, 0, -0.01)
-
-                if model_id == TileModel.CLIFF_TOP_CORNER_DIRT:  # the cliff corners have a deviation as well
-                    glTranslate(-2.08, 0, -0.01)
-
-                if orientation == 90 or orientation == 180:
-                    glTranslate(0, -3, 0)
-                if orientation == 180 or orientation == 270:
-                    glTranslate(3, 0, 0)
-                glRotate(orientation, 0, 0, 1)
-
-                glTranslate(3, 0, 0)
-            glTranslate(-3 * width, -3, 0)
-
-        if pick:
-            glEnable(GL_LIGHTING)
-            glEnable(GL_TEXTURE_2D)
-
-    def _renderProps(self, pick=False):
-        props = self.map.getProps()
-        if self.move_prop and type(self.move_prop) == Prop:
-            selected_prop = [self.move_prop]
-        else:
-            selected_prop = []
-        if self.new_prop:
-            new_prop = [self.new_prop]
-        else:
-            new_prop = []
-
-        if pick:
-            glDisable(GL_TEXTURE_2D)
-            glDisable(GL_LIGHTING)
-            self.colorToProp = {}
-
-        width, height = self.map.getSize()
-        for prop in props + selected_prop + new_prop:
-            if prop.i < 0 or prop.j < 0:  # not allowed
-                continue
-
-            dx, dy = self.prop_models_mono[prop.model].dx, self.prop_models_mono[prop.model].dy
-
-            glTranslate(3 * prop.i + 0.5 * (3 - dx), -3 * prop.j - 0.5 * (3 - dy), 0.3)
-            glRotate(-prop.r, 0, 0, 1)
-            if prop.r == 90 or prop.r == 180:
-                glTranslate(0, dx, 0)
-            if prop.r == 180 or prop.r == 270:
-                glTranslate(-dy, 0, 0)
-
-            if pick:
-                color = (int(prop.i / width * 255), int(prop.j / height * 255), 255)
-                glColor3ub(*color)
-                self.colorToProp[color] = (prop.i, prop.j)
-                glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
-            elif self.move_prop and \
-                    ((type(self.move_prop) == tuple
-                      and prop.i == self.move_prop[0] and prop.j == self.move_prop[1])
-                     or (type(self.move_prop) == Prop
-                         and prop.i == self.move_prop.i and prop.j == self.move_prop.j)):
-                glColor3f(1.0, 1.0, 1.0)
-                glCallList(self.prop_models_mono[prop.model].gl_list)  # draw prop model
-            elif self.new_prop and prop.i == self.new_prop.i and prop.j == self.new_prop.j:
-                glColor3f(0.0, 1.0, 0.0)
-                glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
-            elif self.old_prop and prop.i == self.old_prop[0] and prop.j == self.old_prop[1]:
-                glColor3f(1.0, 0.0, 0.0)
-                glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
-            else:
-                glCallList(self.prop_models[prop.model].gl_list)  # draw prop model
-
-            if prop.r == 90 or prop.r == 180:
-                glTranslate(0, -dx, 0)
-            if prop.r == 180 or prop.r == 270:
-                glTranslate(dy, 0, 0)
-            glRotate(prop.r, 0, 0, 1)
-
-            glTranslate(-3 * prop.i - 0.5 * (3 - dx), 3 * prop.j + 0.5 * (3 - dy), -0.3)
-
-        if pick:
-            glEnable(GL_LIGHTING)
-            glEnable(GL_TEXTURE_2D)
-
-    def _renderEdges(self):
-        edges = self.alg.edges
-        # try:
-        #     best_path = self.alg.getBestPath()
-        # except:
-        #     best_path = []
-
-        glLineWidth(1.0)
-        glBegin(GL_LINES)
-        for (i, j, idest, jdest, r) in edges.keys():
-            # if (i, j, idest, jdest, r) in best_path:
-            #     phero = 100  # for check later
-            #     glColor3f(1.0, 0.0, 0.0)
-            # else:
-            phero = edges[(i, j, idest, jdest, r)][1]
-            glColor3f(0.0, phero, phero)
-            if not edges[(idest, jdest, i, j, (r + 180) % 360)][1] > phero:  # prevent draw in both directions
-                glVertex3f(3 * i + 1.5, -3 * j - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-            if r == 0:
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 - 0.5, 0.35)
-            if r == 90:
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 - 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
-            if r == 180:
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 - 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 + 0.2, -3 * jdest - 1.5 + 0.5, 0.35)
-            if r == 270:
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 + 0.2, 0.35)
-                glVertex3f(3 * idest + 1.5, -3 * jdest - 1.5, 0.35)
-                glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
-        glEnd()
 
     def _getTile(self, i, j):
         """Determines model id and orientation for some tile."""
@@ -786,6 +770,29 @@ class Renderer:
                 elif neighbours == (1, 1, 1, 1):
                     model_id = TileModel.RIVER_JUNCTION_DIRT
         return model_id, orientation
+
+    def _determineLayer(self, layer_type, x, y, z):
+        assert layer_type in LayerType
+        if layer_type == LayerType.FLOOR:
+            layer = self.num_blur_layers
+        else:
+            cam_dist = math.sqrt((x - self.cam_x) ** 2 +
+                                 (y - self.cam_y) ** 2 +
+                                 (z - self.cam_z) ** 2)
+            focus_dist = 25  # zoom such that item is in focus
+            focus_layer = int(self.num_blur_layers / 2)
+            max_blur_dist = 30
+            min_layer, max_layer = 0, self.num_blur_layers - 1
+            step = max_blur_dist / self.num_blur_layers
+            layer = min(max(focus_layer + int((focus_dist - cam_dist) / step), min_layer), max_layer)
+            if layer_type == LayerType.PROPS_ENTITIES:
+                layer += self.num_blur_layers + 1  # tile layers and floor layer
+        return layer
+
+    def _changeLayer(self, layer):
+        if layer != self.current_layer:
+            glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, self.layers[layer], 0)
+            self.current_layer = layer
 
     def _loadModels(self):
         os.chdir('../res/')

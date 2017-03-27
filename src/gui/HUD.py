@@ -61,6 +61,8 @@ class HUD:
         self.screen.surf.blit(txt, (200, 70))
         txt = font.render('Print map in console (p)', 1, (0, 0, 0))
         self.screen.surf.blit(txt, (200, 100))
+        txt = font.render('Toggle between maps (m)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (200, 130))
 
         txt = font.render('Number of rabbits: ' + str(len(self.alg.getEntities())), 1, (0, 0, 0))
         self.screen.surf.blit(txt, (1100, 10))
