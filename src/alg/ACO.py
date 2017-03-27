@@ -76,6 +76,37 @@ class ACO:
                 self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
                 self.edges[(i - 1, j, i, j, 90)] = [1, 0.1]
 
+    def fixEdgesHole(self, i,j, rotation): #fix edges for a new hole
+        width, height = self.map.getSize()
+        edges = [
+            (i, j, i, j - 1, 0),
+            (i, j, i + 1, j, 90),
+            (i, j, i, j + 1, 180),
+            (i, j, i - 1, j, 270),
+            (i, j - 1, i, j, 180),
+            (i + 1, j, i, j, 270),
+            (i, j + 1, i, j, 0),
+            (i - 1, j, i, j, 90),
+        ]
+        for edge in edges:
+            try:
+                self.edges.pop(edge)
+            except KeyError:
+                pass
+
+        if not self.map.tileBlocked(i, j - 1) and j != 1 and rotation == 0:
+            self.edges[(i, j, i, j - 1, 0)] = [1, 0.1]
+            self.edges[(i, j - 1, i, j, 180)] = [1, 0.1]
+        elif not self.map.tileBlocked(i + 1, j) and i != width - 2 and rotation == 90:
+            self.edges[(i, j, i + 1, j, 90)] = [1, 0.1]
+            self.edges[(i + 1, j, i, j, 270)] = [1, 0.1]
+        elif not self.map.tileBlocked(i, j + 1) and j != height - 2 and rotation == 180:
+            self.edges[(i, j, i, j + 1, 180)] = [1, 0.1]
+            self.edges[(i, j + 1, i, j, 0)] = [1, 0.1]
+        elif not self.map.tileBlocked(i - 1, j) and i != 1 and rotation == 270:
+            self.edges[(i, j, i - 1, j, 270)] = [1, 0.1]
+            self.edges[(i - 1, j, i, j, 90)] = [1, 0.1]
+
     def generateEdges(self):
         """Generates all the edges based on the map."""
         edges = {}
@@ -92,6 +123,12 @@ class ACO:
                     edges[(i, j, i, j + 1, 180)] = [1, 0.1]
                 if not self.map.tileBlocked(i - 1, j) and i != 1:
                     edges[(i, j, i - 1, j, 270)] = [1, 0.1]
+                try:
+                    if self.map.getProp(i, j).model.name == 'HOLE':
+                        print('yeey')
+                        self.fixEdgesHole(i,j, self.map.getProp(i,j).r)
+                except:
+                    pass
         return edges
 
 

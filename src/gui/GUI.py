@@ -213,7 +213,7 @@ class GUI:
                             if tile is not None and not self.map.tileOccupied(*tile):
                                 self.map.placeProp(self.renderer.new_prop)
                                 self.map.addStartPos(*tile)
-                                self.alg.fixEdges(*tile)
+                                self.alg.fixEdgesHole(*tile, self.renderer.new_prop[2])
                                 self.renderer.new_prop = Prop.randomHole(-1, -1)
                         elif self.hud.mode == HUDMode.PLACE_END:
                             tile = self.renderer.getTileCoords(e.pos[0], e.pos[1])
