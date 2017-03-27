@@ -5,20 +5,10 @@ from enum import Enum
 class Map:
     def __init__(self):
         self.initMap()
-
-    def toggleMap(self):
-        if self.current_map == 0:
-            self.smallMap()
-        elif self.current_map == 1:
-            self.mediumMap()
-        #elif self.current_map == 2:
-        #    self.largeMap()
-        else:
-            self.initMap()
+        self.setStartingPoints()
+        self.setEndPoints()
 
     def initMap(self):
-        self.start_pos = [(1, 1)]
-        self.end_pos = [(9, 6)]
         self.size = (11, 8)
         self.current_map = 0;
         tiles = [  # 0 = land, 1 = water
@@ -44,20 +34,18 @@ class Map:
         ]
 
     def smallMap(self):
-        self.start_pos = [(1, 1)]
-        self.end_pos = [(8, 8)]
         self.size = (10, 10)
         self.current_map = 1
         tiles = [
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 1, 1, 1, 0, 1, 0],
+            [0, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 1, 0, 0, 0, 1, 0],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
-            [0, 0, 1, 0, 1, 0, 0, 1, 0, 0],
-            [0, 0, 1, 0, 0, 1, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 0, 1, 0, 0, 1, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
-            [0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
-            [0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+            [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         ]
         self.tiles = list(map(list, zip(*tiles)))  # transposed
@@ -66,9 +54,9 @@ class Map:
             Prop(1, 1, 90, PropModel.HOLE),  # start
             Prop(8, 8, 0, PropModel.PLANT_1),  # end
             Prop(1, 7, 90, PropModel.GREY_ROCK),
-            Prop(2, 7, 270, PropModel.GREY_ROCK),
+            Prop(7, 1, 270, PropModel.GREY_ROCK),
             Prop(3, 7, 270, PropModel.GREY_ROCK),
-            Prop(5, 4, 270, PropModel.GREY_ROCK),
+            Prop(5, 8, 270, PropModel.GREY_ROCK),
             Prop(8, 2, 0, PropModel.TREE_LONG),
             Prop(6, 2, 0, PropModel.TREE_LONG),
             Prop(4, 5, 0, PropModel.TREE_ORANGE),
@@ -76,83 +64,183 @@ class Map:
         ]
 
     def mediumMap(self):
-        self.start_pos = [(1, 1)]
-        self.end_pos = [(18, 18)]
-        self.size = (20, 20)
+        # Still TODO!
+        self.size = (15, 15)
         self.current_map = 2
         tiles = [
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+            [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         ]
         self.tiles = list(map(list, zip(*tiles)))  # transposed
 
         self.props = [
             Prop(1, 1, 90, PropModel.HOLE),  # start
-            Prop(18, 18, 0, PropModel.PLANT_1),  # end
-            Prop(18, 4, 90, PropModel.GREY_ROCK),
-            Prop(17, 4, 270, PropModel.GREY_ROCK),
-            Prop(16, 4, 270, PropModel.GREY_ROCK),
-            Prop(15, 4, 90, PropModel.GREY_ROCK),
-            Prop(14, 4, 270, PropModel.GREY_ROCK),
-            Prop(13, 4, 270, PropModel.GREY_ROCK),
-            Prop(9, 9, 0, PropModel.TREE_LONG),
-            Prop(8, 9, 0, PropModel.TREE_LONG),
-            Prop(7, 10, 0, PropModel.TREE_LONG),
-            Prop(13, 9, 0, PropModel.TREE_ORANGE),
-            Prop(14, 9, 0, PropModel.TREE_ORANGE),
-            Prop(13, 10, 0, PropModel.TREE_ORANGE),
-            Prop(16, 3, 0, PropModel.TENT),
-            Prop(15, 3, 0, PropModel.TENT),
+            Prop(13, 13, 90, PropModel.FLOWER_RED),  # end
+            Prop(1, 7, 90, PropModel.GREY_ROCK),
+            Prop(1, 11, 180, PropModel.GREY_ROCK),
+            Prop(4, 5, 270, PropModel.GREY_ROCK),
+            Prop(6, 5, 180, PropModel.GREY_ROCK),
+            Prop(7, 5, 90, PropModel.GREY_ROCK),
+            # First row of camping
+            Prop(3, 3, 0, PropModel.TENT),
+            Prop(4, 3, 0, PropModel.TREE_LONG),
+            Prop(4, 4, 0, PropModel.TREE_LONG),
+            Prop(6, 3, 0, PropModel.TENT),
+            Prop(7, 3, 0, PropModel.TREE_LONG),
+            Prop(7, 4, 0, PropModel.TREE_LONG),
+            Prop(9, 3, 0, PropModel.TENT),
+            Prop(10, 3, 0, PropModel.TREE_LONG),
+            Prop(10, 4, 0, PropModel.TREE_LONG),
+            # Second row of camping
+            Prop(3, 7, 0, PropModel.TENT),
+            Prop(4, 7, 0, PropModel.TREE_LONG),
+            Prop(4, 8, 0, PropModel.TREE_LONG),
+            Prop(6, 7, 0, PropModel.TENT),
+            Prop(7, 7, 0, PropModel.TREE_LONG),
+            Prop(7, 8, 0, PropModel.TREE_LONG),
+            Prop(9, 7, 0, PropModel.TENT),
+            Prop(10, 7, 0, PropModel.TREE_LONG),
+            Prop(10, 8, 0, PropModel.TREE_LONG),
+            # Third row of camping
+            Prop(3, 11, 0, PropModel.TENT),
+            Prop(4, 11, 0, PropModel.TREE_LONG),
+            Prop(4, 12, 0, PropModel.TREE_LONG),
+            Prop(6, 11, 0, PropModel.TENT),
+            Prop(7, 11, 0, PropModel.TREE_LONG),
+            Prop(7, 12, 0, PropModel.TREE_LONG),
+            Prop(9, 11, 0, PropModel.TENT),
+            Prop(10, 11, 0, PropModel.TREE_LONG),
+            Prop(10, 12, 0, PropModel.TREE_LONG),
+            # Rocks on the right
+            Prop(12, 2, 270, PropModel.GREY_ROCK),
+            Prop(12, 4, 270, PropModel.GREY_ROCK),
+            Prop(12, 6, 270, PropModel.GREY_ROCK),
+            Prop(12, 10, 270, PropModel.GREY_ROCK),
+            Prop(12, 12, 270, PropModel.GREY_ROCK),
+            # Three orange trees on the left
+            Prop(1, 3, 0, PropModel.TREE_ORANGE),
+            Prop(1, 9, 90, PropModel.TREE_ORANGE),
+            Prop(1, 13, 180, PropModel.TREE_ORANGE),
+            # Pumpkins random
+            Prop(9, 4, 0, PropModel.PUMPKIN),
+            Prop(2, 5, 90, PropModel.PUMPKIN),
+            Prop(5, 11, 180, PropModel.PUMPKIN),
+            Prop(11, 1, 270, PropModel.PUMPKIN),
+            # Top orange trees
+            Prop(3, 1, 0, PropModel.TREE_ORANGE),
+            Prop(8, 1, 90, PropModel.TREE_ORANGE),
+            Prop(13, 1, 180, PropModel.TREE_ORANGE),
+            # More end points
+            Prop(3, 8, 90, PropModel.FLOWER_TALL_YELLOW),
+            Prop(13, 2, 180, PropModel.FLOWER_TALL_BLUE),
+            Prop(2, 13, 270, PropModel.FLOWER_TALL_RED),
         ]
 
     def largeMap(self):
-        # Still TODO!
-        self.start_pos = [(1, 1)]
-        self.end_pos = [(8, 8)]
         self.size = (20, 20)
-        self.current_map = 2
+        self.current_map = 3
         tiles = [
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 0, 0, 0, 0, 1, 1],
-            [1, 0, 1, 1, 1, 1, 1, 0, 0, 1],
-            [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-            [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-            [1, 0, 1, 0, 0, 1, 1, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1, 1, 0, 0, 1],
-            [1, 1, 0, 0, 0, 1, 1, 0, 0, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0],
+            [0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1],
+            [0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
         ]
         self.tiles = list(map(list, zip(*tiles)))  # transposed
 
         self.props = [
             Prop(1, 1, 90, PropModel.HOLE),  # start
-            Prop(8, 8, 0, PropModel.PLANT_1),  # end
-            Prop(1, 7, 90, PropModel.GREY_ROCK),
-            Prop(2, 7, 270, PropModel.GREY_ROCK),
-            Prop(2, 8, 270, PropModel.GREY_ROCK),
-            Prop(3, 8, 0, PropModel.TREE_LONG),
-            Prop(4, 8, 0, PropModel.TREE_ORANGE),
-            Prop(8, 2, 0, PropModel.TENT),
+            Prop(4, 17, 90, PropModel.HOLE), # start
+            Prop(3, 18, 90, PropModel.PLANT_5), # end
+            Prop(14, 13, 270, PropModel.PLANT_6), # end
+            Prop(18, 18, 0, PropModel.FLOWER_TALL_BLUE),  # end
+            Prop(13, 4, 90, PropModel.GREY_ROCK),
+            Prop(14, 4, 90, PropModel.FLOWER_YELLOW),
+            Prop(16, 4, 90, PropModel.FLOWER_YELLOW),
+            Prop(12, 4, 90, PropModel.FLOWER_YELLOW),
+            Prop(14, 3, 90, PropModel.FLOWER_TALL_RED), # end
+            Prop(12, 3, 90, PropModel.FLOWER_TALL_RED), # end
+            Prop(16, 3, 90, PropModel.FLOWER_TALL_RED), # end
+            Prop(12, 5, 90, PropModel.FLOWER_TALL_BLUE), # end
+            Prop(14, 5, 90, PropModel.FLOWER_TALL_BLUE), # end
+            Prop(16, 5, 90, PropModel.FLOWER_TALL_BLUE), # end
+            Prop(15, 4, 270, PropModel.GREY_ROCK),
+            Prop(14, 11, 270, PropModel.GREY_ROCK),
+            Prop(14, 12, 90, PropModel.GREY_ROCK),
+            Prop(14, 13, 270, PropModel.GREY_ROCK),
+            Prop(10, 14, 270, PropModel.GREY_ROCK),
+            Prop(3, 11, 0, PropModel.GREY_ROCK),
+            Prop(15, 12, 270, PropModel.FLOWER_TALL_RED), # end
+            Prop(6, 6, 0, PropModel.TREE_LONG),
+            Prop(6, 12, 0, PropModel.TREE_LONG),
+            Prop(12, 6, 0, PropModel.TREE_LONG),
+            Prop(12, 12, 0, PropModel.TREE_LONG),
+            Prop(7, 16, 180, PropModel.TREE_ORANGE),
+            Prop(11, 16, 0, PropModel.TREE_ORANGE),
+            Prop(15, 11, 0, PropModel.TREE_ORANGE),
+            Prop(15, 13, 180, PropModel.TREE_ORANGE),
+            Prop(11, 4, 0, PropModel.TREE_ORANGE),
+            Prop(7, 4, 0, PropModel.TREE_ORANGE),
+            Prop(2, 7, 90, PropModel.TREE_ORANGE),
+            Prop(1, 18, 90, PropModel.TREE_ORANGE),
+            Prop(9, 9, 0, PropModel.TENT),
+            Prop(2, 18, 0, PropModel.PUMPKIN),
+            Prop(11, 1, 0, PropModel.PUMPKIN),
         ]
+
+    def toggleMap(self):
+        if self.current_map == 0:
+            self.smallMap()
+        elif self.current_map == 1:
+            self.mediumMap()
+        elif self.current_map == 2:
+            self.largeMap()
+        else:
+            self.initMap()
+        self.setStartingPoints()
+        self.setEndPoints()
+
+    def setStartingPoints(self):
+        self.start_pos = []
+        props = self.props
+        for prop in props:
+            if prop.model == PropModel.HOLE:
+                self.addStartPos(prop.i, prop.j)
+
+    def setEndPoints(self):
+        self.end_pos = []
+        props = self.props
+        for prop in props:
+            if prop.model in PropModel.food():
+                self.addEndPos(prop.i, prop.j)
 
     def getSize(self):
         # (width, height) including map edges
@@ -185,7 +273,7 @@ class Map:
             return True
         for prop in self.props:
             if prop.i == i and prop.j == j \
-                    and (prop.model in PropModel.trees() + PropModel.rocks()):
+                    and (prop.model in PropModel.trees() + PropModel.rocks() + PropModel.decoration()):
                 return True
         return False
 
@@ -324,4 +412,5 @@ class PropModel(Enum):
 
     @staticmethod
     def decoration():
-        return [PropModel.PUMPKIN]
+        return [PropModel.PUMPKIN,
+                PropModel.TENT]

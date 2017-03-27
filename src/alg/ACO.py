@@ -115,8 +115,8 @@ class Entity:
         self.step_count = 0 # The number of steps the entity has taken towards the target
         self.way = [] # The edges it walked along on its' way to the target
         self.way_back = [] # The edges it will take on its' way back to the starting point
-        # self.startpos = self.map.getStartPos()
-        self.start_pos = (i, j)  # TODO allow multiple start positions
+        self.start_pos = self.map.getStartPos() # The location(s) of the start positions
+        # self.start_pos = (i, j)  # TODO allow multiple start positions
         self.end_pos = self.map.getEndPos() #the location of the target(s)
         self.prevpos = ()  # The previous position of the entity
         self.best_path = best_path # The best path that an entity has walked
@@ -191,7 +191,7 @@ class Entity:
                 except KeyError:  # probably an object was placed on reversed path
                     self.is_lost = True  # TODO have the entity actually be lost and having to find a way back to a home
                 newpos = (path[2], path[3])
-                if newpos == self.start_pos:
+                if newpos in self.start_pos:
                     self.found_food = 0
                 return True
 
