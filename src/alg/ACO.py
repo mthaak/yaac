@@ -11,11 +11,11 @@ class ACO:
         width, height = self.map.getSize()
         best_path = (width - 2) * (height - 2)
         self.entities = [
-            Entity(map, 0, 'rabbit', RabbitColor.WHITE, 1, 1, 0, self.edges, 0, best_path),
-            Entity(map, 0, 'rabbit', RabbitColor.GREY, 1, 1, 0, self.edges, 0, best_path),
-            Entity(map, 0, 'rabbit', RabbitColor.BLACK, 1, 1, 0, self.edges, 0, best_path),
-            Entity(map, 0, 'rabbit', RabbitColor.BROWN, 1, 1, 0, self.edges, 0, best_path),
-            Entity(map, 0, 'rabbit', RabbitColor.BEIGE, 1, 1, 0, self.edges, 0, best_path)
+            Entity(map, 0, 'rabbit', RabbitColor.WHITE, 2, 1, 0, self.edges, 0, best_path, True),
+            Entity(map, 0, 'rabbit', RabbitColor.GREY, 1, 1, 0, self.edges, 0, best_path, False),
+            Entity(map, 0, 'rabbit', RabbitColor.BLACK, 1, 1, 0, self.edges, 0, best_path, False),
+            Entity(map, 0, 'rabbit', RabbitColor.BROWN, 1, 1, 0, self.edges, 0, best_path, False),
+            Entity(map, 0, 'rabbit', RabbitColor.BEIGE, 1, 1, 0, self.edges, 0, best_path, False)
         ]
 
     def update(self):
@@ -139,7 +139,7 @@ class ACO:
 
 
 class Entity:
-    def __init__(self, map, index, type, color, i, j, orient, edges, found_food, best_path):
+    def __init__(self, map, index, type, color, i, j, orient, edges, found_food, best_path, is_lost):
         self.map = map
         self.index = index
         self.type = 'rabbit'  # TODO create other possibilities
@@ -148,19 +148,19 @@ class Entity:
         self.j = j
         self.orient = orient
         self.edges = edges
-        self.alpha = 2  # This can be anything, and might be variable
-        self.beta = 10  # This can be anyting, and might be variable
+        self.alpha = 1  # This can be anything, and might be variable
+        self.beta = 1  # This can be anyting, and might be variable
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
         self.found_food = found_food
         self.step_count = 0
         self.way = []
         self.way_back = []
         # self.startpos = self.map.getStartPos()
-        self.start_pos = (i, j)  # TODO allow multiple start positions
+        self.start_pos = [(i, j)]  #
         self.end_pos = self.map.getEndPos()
         self.prevpos = ()
         self.best_path = best_path
-        self.is_lost = False  # whether entity lost its path back to its start
+        self.is_lost = is_lost  # whether entity lost its path back to its start
         self.visited_edges = [(i, j)]
 
     def getEdges(self, i, j, edges, prevpos):
@@ -302,7 +302,7 @@ class Entity:
                     self.way_back = []
                     self.way = []
                 newpos = (path[2], path[3])
-                if newpos == self.start_pos:
+                if newpos in self.start_pos:
                     self.found_food = 0
                 return True
 
