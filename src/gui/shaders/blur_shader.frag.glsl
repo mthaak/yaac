@@ -1,3 +1,4 @@
+#version 330
 // from http://rastergrid.com/blog/2010/09/efficient-gaussian-blur-with-linear-sampling/
 uniform sampler2D image;
 

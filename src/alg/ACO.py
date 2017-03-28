@@ -148,8 +148,8 @@ class Entity:
         self.j = j
         self.orient = orient
         self.edges = edges
-        self.alpha = 1  # This can be anything, and might be variable
-        self.beta = 1  # This can be anyting, and might be variable
+        self.alpha = 10  # This can be anything, and might be variable
+        self.beta = 10  # This can be anyting, and might be variable
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
         self.found_food = found_food
         self.step_count = 0

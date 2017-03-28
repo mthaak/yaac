@@ -103,9 +103,9 @@ class GUI:
         # start_pygame()
 
         pygame.init()
-        self.screen_width, self.screen_height = 1280, 1024
+        self.screen_width, self.screen_height = 1920, 1080
         viewport = (self.screen_width, self.screen_height)
-        srf = pygame.display.set_mode(viewport, OPENGL | DOUBLEBUF)
+        srf = pygame.display.set_mode(viewport, OPENGL | DOUBLEBUF | FULLSCREEN)
         pygame.display.set_caption('YAAC')
         self.clock = pygame.time.Clock()
 

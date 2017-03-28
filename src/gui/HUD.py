@@ -65,13 +65,13 @@ class HUD:
         self.screen.surf.blit(txt, (200, 130))
 
         txt = font.render('Number of rabbits: ' + str(len(self.alg.getEntities())), 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (1100, 10))
+        self.screen.surf.blit(txt, (self.viewport[0] - 180, 10))
         txt = font.render('Best path: ' + str(self.alg.getBestPath()), 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (1100, 40))
+        self.screen.surf.blit(txt, (self.viewport[0] - 180, 40))
         txt = font.render('FPS: ' + str(round(self.fps, 2)), 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (1100, 70))
+        self.screen.surf.blit(txt, (self.viewport[0] - 180, 70))
         txt = font.render('Move frames (,.): ' + str(self.move_frames), 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (1100, 100))
+        self.screen.surf.blit(txt, (self.viewport[0] - 180, 100))
 
         self.screen.refresh()
         # self.screen.refreshPosition()
