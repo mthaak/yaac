@@ -11,7 +11,7 @@ class ACO:
         width, height = self.map.getSize()
         best_path = (width - 2) * (height - 2)
         self.entities = [
-            Entity(map, 0, 'rabbit', RabbitColor.WHITE, 2, 1, 0, self.edges, 0, best_path, True),
+            Entity(map, 0, 'rabbit', RabbitColor.WHITE, 2, 1, 0, self.edges, 0, best_path, False),
             Entity(map, 0, 'rabbit', RabbitColor.GREY, 1, 1, 0, self.edges, 0, best_path, False),
             Entity(map, 0, 'rabbit', RabbitColor.BLACK, 1, 1, 0, self.edges, 0, best_path, False),
             Entity(map, 0, 'rabbit', RabbitColor.BROWN, 1, 1, 0, self.edges, 0, best_path, False),
@@ -36,7 +36,7 @@ class ACO:
     def evaporate(self):
         rho = 0.05  # evaporation rate
         for edge in self.edges:
-            self.edges[edge][1] = (1 - rho) * self.edges[edge][1]
+            self.edges[edge][1] *= (1 - rho)
             if self.edges[edge][1] < 0.1:
                 self.edges[edge][1] = 0.1
             elif self.edges[edge][1] > 5:

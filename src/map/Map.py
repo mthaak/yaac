@@ -64,7 +64,6 @@ class Map:
         ]
 
     def mediumMap(self):
-        # Still TODO!
         self.size = (15, 15)
         self.current_map = 2
         tiles = [
@@ -268,19 +267,18 @@ class Map:
         return self.tiles
 
     def tileBlocked(self, i, j):
-        """A tile is blocked when it contains water or a prop which blocks the tile."""
-        if self.tiles[i][j] == 1:
+        """A tile is blocked when it is on the edge, it contains water or any prop which blocks the tile."""
+        if self.tiles[i][j] == 1 or i == 0 or i == self.size[0] - 1 or j == 0 or j == self.size[1] - 1:
             return True
+        blocking_props = PropModel.trees() + PropModel.rocks() + PropModel.tents() + PropModel.decoration()
         for prop in self.props:
-            if prop.i == i and prop.j == j \
-                    and (
-                                prop.model in PropModel.trees() + PropModel.rocks() + PropModel.tents() + PropModel.decoration()):
+            if prop.i == i and prop.j == j and prop.model in blocking_props:
                 return True
         return False
 
     def tileOccupied(self, i, j):
-        """A tile is occupied when it contains water or any prop."""
-        if self.tiles[i][j] == 1:
+        """A tile is occupied when it is on the edge, it contains water or any prop."""
+        if self.tiles[i][j] == 1 or i == 0 or i == self.size[0] - 1 or j == 0 or j == self.size[1] - 1:
             return True
         for prop in self.props:
             if prop.i == i and prop.j == j:

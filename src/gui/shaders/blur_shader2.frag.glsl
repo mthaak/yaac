@@ -13,7 +13,9 @@ uniform vec4      iDate;                 // (year, month, day, time in seconds)
 uniform float     iSampleRate;           // sound sample rate (i.e., 44100)
 
 uniform float     radius;                // radius of blur
+uniform sampler2D backgroundTexture;
 uniform sampler2D foregroundTexture;
+uniform bool      useBG;
 uniform bool      useFG;
 
 float SCurve (float x) {
@@ -28,10 +30,11 @@ vec4 BlurV (sampler2D source, vec2 size, vec2 uv, float radius) {
     // Hack such that edges are not blurred
     bool isEdge = texture(source, uv).r == 0.015; // specific red
 
-	if (radius >= 1.0 && !isEdge)
+	if (radius >= 1.0)
 	{
 		vec4 A = vec4(0.0);
 		vec4 C = vec4(0.0);
+		vec4 BG = vec4(0.0);
 		vec4 FG = vec4(0.0);
 
 		float height = 1.0 / size.y;
@@ -45,7 +48,10 @@ vec4 BlurV (sampler2D source, vec2 size, vec2 uv, float radius) {
         for (float y = -radius; y <= radius; y++)
 		{
 			A = texture(source, uv + vec2(0.0, y * height));
-			FG = texture(foregroundTexture, uv + vec2(0.0, y * height));
+			if (useBG)
+			    BG = texture(backgroundTexture, uv + vec2(0.0, y * height));
+			if (useFG)
+			    FG = texture(foregroundTexture, uv + vec2(0.0, y * height));
 
             if (uv.y + y * height >= 0) {
 
@@ -57,7 +63,7 @@ vec4 BlurV (sampler2D source, vec2 size, vec2 uv, float radius) {
                     C.b += A.b * weight;
                     divisor += weight;
                 }
-                if (!useFG || FG.a == 0) {
+                if (A.a > 0 || ((!useBG || BG.a == 0) && (!useFG ||FG.a == 0))) {
                     C.a += A.a * weight;
                     a_divisor += weight;
                 }

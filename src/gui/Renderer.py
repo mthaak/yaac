@@ -10,7 +10,7 @@ from src.gui.Shader import Shader
 from src.gui.objloader import *
 from src.map.Map import *
 
-ENABLE_SHADERS = False
+ENABLE_SHADERS = True
 
 
 class TileModel(Enum):
@@ -42,8 +42,8 @@ class Renderer:
             self.shader = Shader()
 
         # OPTIONS
-        self.show_grid = False
-        self.show_edges = False
+        self.show_grid = False  # TODO currently used for question marks
+        self.show_edges = True
 
         width, height = map.getSize()
         self.center_x = width / 2 * 3
@@ -69,7 +69,7 @@ class Renderer:
         self.entity_move_frames = 10
 
         self._loadModels()
-        self.question_mark = self._charTexFromPNG('?', color=(0, 255, 255))  # used for show entity is lost
+        self.question_mark = self._charTexFromPNG('?', color=(255, 0, 0))  # used for show entity is lost
 
         # Used for selection
         self.selected_tile = None
@@ -221,7 +221,7 @@ class Renderer:
         glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, layers[0], 0)
 
         # Set the list of draw buffers.
-        glDrawBuffers(1, [GL_COLOR_ATTACHMENT0])
+        glDrawBuffers(1, [GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT])
 
         # Always check that our framebuffer is ok
         if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
@@ -256,6 +256,8 @@ class Renderer:
             res_uniform = glGetUniformLocation(self.shader.blur_program, 'iResolution')
             radius_uniform = glGetUniformLocation(self.shader.blur_program, 'radius')
             tex_uniform = glGetUniformLocation(self.shader.blur_program, 'iChannel0')
+            bg_uniform = glGetUniformLocation(self.shader.blur_program, 'backgroundTexture')
+            use_bg_uniform = glGetUniformLocation(self.shader.blur_program, 'useBG')
             fg_uniform = glGetUniformLocation(self.shader.blur_program, 'foregroundTexture')
             use_fg_uniform = glGetUniformLocation(self.shader.blur_program, 'useFG')
 
@@ -304,31 +306,37 @@ class Renderer:
             glVertex2f(-1.0, 1.0)
             glEnd()
 
-        max_radius = 10
-        step_radius = max_radius / (self.num_blur_layers - 1)
-
         if ENABLE_SHADERS:
             glUseProgram(self.shader.blur_program)
             glUniform3f(res_uniform, self.viewport[0], self.viewport[1], 1.0)
             glUniform1i(tex_uniform, 0)
-            glUniform1i(fg_uniform, 1)
+            glUniform1i(bg_uniform, 1)
+            glUniform1i(fg_uniform, 2)
+
+        max_radius = 4
+        step_radius = max_radius / int((self.num_blur_layers - 1) / 2)
 
         # Draw tile layers
         for i in range(0, self.num_blur_layers):
             center_i = int(self.num_blur_layers / 2)
             radius = abs(center_i - i) * step_radius
-            if ENABLE_SHADERS:
-                glUniform1f(radius_uniform, radius)
             glActiveTexture(GL_TEXTURE0)
             glBindTexture(GL_TEXTURE_2D, self.layers[i])
             if ENABLE_SHADERS:
+                glUniform1f(radius_uniform, radius)
+                if i > 0:
+                    glUniform1f(use_bg_uniform, True)
+                    glActiveTexture(GL_TEXTURE1)
+                    glBindTexture(GL_TEXTURE_2D, self.layers[i - 1])
+                else:
+                    glUniform1f(use_bg_uniform, False)
                 if i < self.num_blur_layers - 1:
                     glUniform1f(use_fg_uniform, True)
-                    glActiveTexture(GL_TEXTURE1)
+                    glActiveTexture(GL_TEXTURE2)
                     glBindTexture(GL_TEXTURE_2D, self.layers[i + 1])
                 else:
                     glUniform1f(use_fg_uniform, False)
-            if ENABLE_SHADERS:
+
                 glDrawArrays(GL_QUADS, 0, 4)
             else:
                 glBegin(GL_QUADS)
@@ -343,23 +351,24 @@ class Renderer:
                 glEnd()
         glActiveTexture(GL_TEXTURE0)
 
-        # glUseProgram(self.shader.normal_program)
-        #
-        # if self.show_grid:
-        #     glBindTexture(GL_TEXTURE_2D, self.grid_layer)
-        #     glDrawArrays(GL_QUADS, 0, 4)
-        #
-        # if self.show_edges:
-        #     glBindTexture(GL_TEXTURE_2D, self.edges_layer)
-        #     glDrawArrays(GL_QUADS, 0, 4)
+        glUseProgram(self.shader.normal_program)
+
+        if self.show_edges:
+            glBindTexture(GL_TEXTURE_2D, self.layers[self.edges_layer])
+            glDrawArrays(GL_QUADS, 0, 4)
+
+        if self.show_grid:
+            glBindTexture(GL_TEXTURE_2D, self.grid_layer)
+            glDrawArrays(GL_QUADS, 0, 4)
 
         if ENABLE_SHADERS:
             glUseProgram(self.shader.blur_program)
 
         # Draw prop layers (with entities)
         if ENABLE_SHADERS:
+            glUniform1f(use_bg_uniform, False)
             glUniform1f(use_fg_uniform, False)
-        for i in range(self.num_blur_layers + 1, self.num_layers):
+        for i in range(self.num_blur_layers + 2, self.num_layers):
             center_i = self.num_blur_layers + 2 + int(self.num_blur_layers / 2)
             radius = abs(center_i - i) * step_radius
             if ENABLE_SHADERS:
@@ -454,11 +463,13 @@ class Renderer:
     def _renderEdges(self):
         edges = self.alg.edges
 
-        self._changeLayer(4)  # TODO fix hack
+        self._changeLayer(self.edges_layer)  # TODO fix hack
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, self.layers[self.edges_layer], 0)
 
         self._resetCamera()
 
         glLineWidth(1.0)
+        glDisable(GL_DEPTH_TEST)
         glDisable(GL_LIGHTING)
         glBegin(GL_LINES)
         for (i, j, idest, jdest, r) in edges.keys():
@@ -491,6 +502,7 @@ class Renderer:
                 glVertex3f(3 * idest + 1.5 + 0.5, -3 * jdest - 1.5 - 0.2, 0.35)
         glEnd()
         glEnable(GL_LIGHTING)
+        glEnable(GL_DEPTH_TEST)
 
     def _renderTiles(self, select=None, pick=False):
         """Renders the tiles.
@@ -674,23 +686,23 @@ class Renderer:
                 glBindTexture(GL_TEXTURE_2D, self.question_mark)
                 glBegin(GL_QUADS)
                 glTexCoord2f(0, 0)
-                glVertex3f(0, 0, 0.5)
+                glVertex3f(0, 0, 1)
                 glTexCoord2f(1, 0)
-                glVertex3f(0.5, 0, 0.5)
+                glVertex3f(1, 0, 1)
                 glTexCoord2f(1, 1)
-                glVertex3f(0.5, 0, 0)
+                glVertex3f(1, 0, 0)
                 glTexCoord2f(0, 1)
                 glVertex3f(0, 0, 0)
                 glEnd()
                 glEnable(GL_LIGHTING)
                 glDisable(GL_BLEND)
                 glDisable(GL_TEXTURE_2D)
-                glTranslate(0.25, 0, -1)
+                glTranslate(0.5, 0, -1)
                 glRotate(-rotation, 0, 0, 1)
 
             glScale(scale, scale, scale)
             if entity == self.new_entity:
-                glColor3f(0.0, 1.0, 0.0)  # draw in red
+                glColor3f(0.0, 1.0, 0.0)  # draw in green
             # Give the rabbits a different color
             elif entity.color == RabbitColor.WHITE:
                 glColor(1.0, 1.0, 1.0)
@@ -704,7 +716,7 @@ class Renderer:
                 glColor(0.95, 0.84, 0.62)
             elif entity.color == RabbitColor.ORANGE:
                 glColor(0.80, 0.39, 0.16)
-            glCallList(self.rabbit_models[0].gl_list)  # TODO change back self.rabbit_anim_frame
+            glCallList(self.rabbit_models[self.rabbit_anim_frame].gl_list)
             glScale(1 / scale, 1 / scale, 1 / scale)
 
             glTranslate(-dev_x, -dev_y, 0)
@@ -824,7 +836,7 @@ class Renderer:
             step = max_blur_dist / self.num_blur_layers
             layer = min(max(focus_layer + int((focus_dist - cam_dist) / step), min_layer), max_layer)
             if layer_type == LayerType.PROPS_ENTITIES:
-                layer += self.num_blur_layers + 1  # tile layers and floor layer
+                layer += self.num_blur_layers + 2  # tile layers, grid layer and edges layer
         return layer
 
     def _changeLayer(self, layer):
@@ -856,9 +868,8 @@ class Renderer:
 
         # Load entities
         os.chdir('rabbit/anim_run/')
-        # for frame in range(self.rabbit_anim_frames):
-        #     self.rabbit_models.append(OBJ('rabbit_{0:06d}.obj'.format(frame), swapyz=True, monocolor=True))
-        self.rabbit_models.append(OBJ('rabbit_000000.obj', swapyz=True, monocolor=True))  # TODO remove
+        for frame in range(self.rabbit_anim_frames):
+            self.rabbit_models.append(OBJ('rabbit_{0:06d}.obj'.format(frame), swapyz=True, monocolor=True))
         os.chdir('../../')
 
         os.chdir('../src/')
