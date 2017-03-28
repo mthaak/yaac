@@ -192,11 +192,11 @@ class Entity:
         for edge in returned_edges:
             # if the direction is the same, we give the edge a bonus
             if edge[4] == self.orient:
-                returned_edges[edge][0] = +4
+                returned_edges[edge][0] = returned_edges[edge][0]*1.5
 
-            for i in self.visited_edges:
-                if i == (edge[3], edge[4]):
-                    returned_edges[edge][0] = returned_edges[edge][0] / 2
+            for n in self.visited_edges:
+                if n == (edge[2], edge[3]):
+                    returned_edges[edge][0] = returned_edges[edge][0] / 8
         # returned_edges[(0,1,0,1)] = edges[(0,1,0,1)] #replace with workable values
         return returned_edges
 

@@ -118,6 +118,8 @@ class GUI:
 
         self.hud.refresh()  # first draw
 
+        self.map.toggleMap()
+        self.alg.__init__(self.map)
         self.alg.update()  # first update needed to let entities get correct orientation
 
         self.mainloop()  # start main loop
