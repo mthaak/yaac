@@ -10,6 +10,8 @@ from src.gui.Shader import Shader
 from src.gui.objloader import *
 from src.map.Map import *
 
+ENABLE_SHADERS = False
+
 
 class TileModel(Enum):
     FLAT_DIRT = 'naturepack_extended/Models/naturePack_001.obj'
@@ -36,7 +38,8 @@ class Renderer:
         self.viewport = viewport
         self.map = map
         self.alg = alg
-        self.shader = Shader()
+        if ENABLE_SHADERS:
+            self.shader = Shader()
 
         # OPTIONS
         self.show_grid = False
@@ -116,21 +119,9 @@ class Renderer:
 
     def renderHUD(self, screen):
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
         glDisable(GL_DEPTH_TEST)
-        # glMatrixMode(GL_PROJECTION)
-        # glPushMatrix()
-        # glLoadIdentity()
-        # glMatrixMode(GL_MODELVIEW)
-        # glPushMatrix()
         glLoadIdentity()
-
         screen.display()
-
-        # glPopMatrix()
-        # glMatrixMode(GL_PROJECTION)
-        # glPopMatrix()
-        # glMatrixMode(GL_MODELVIEW)
         glEnable(GL_DEPTH_TEST)
 
     def renderLayers(self, selectedTile=None, selectedProp=None, redProp=None, greenProp=None):
@@ -255,22 +246,24 @@ class Renderer:
 
     def _draw(self):
         self.vbo.bind()
-        # tell OpenGL that the VBO contains an array of vertices
-        # prepare the shader
-        positionAttrib = glGetAttribLocation(self.shader.blur_program, 'position')
-        coordsAttrib = glGetAttribLocation(self.shader.blur_program, 'texCoords')
-        res_uniform = glGetUniformLocation(self.shader.blur_program, 'iResolution')
-        radiusUniform = glGetUniformLocation(self.shader.blur_program, 'radius')
 
+        if ENABLE_SHADERS:
+            # Prepare the shader
+            position_attrib = glGetAttribLocation(self.shader.blur_program, 'position')
+            coords_attrib = glGetAttribLocation(self.shader.blur_program, 'texCoords')
+            res_uniform = glGetUniformLocation(self.shader.blur_program, 'iResolution')
+            radius_uniform = glGetUniformLocation(self.shader.blur_program, 'radius')
+            tex_uniform = glGetUniformLocation(self.shader.blur_program, 'iChannel0')
+            fg_uniform = glGetUniformLocation(self.shader.blur_program, 'foregroundTexture')
+            use_fg_uniform = glGetUniformLocation(self.shader.blur_program, 'useFG')
+
+        # Tell OpenGL that the VBO contains an array of vertices
         glEnableVertexAttribArray(0)
         glEnableVertexAttribArray(1)
         # these vertices contain 2 single precision coordinates
-        glVertexAttribPointer(positionAttrib, 3, GL_FLOAT, GL_FALSE, 20, None)
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_TRUE, 20, ctypes.c_void_p(12))
-
-        tex_uniform = glGetUniformLocation(self.shader.blur_program, 'iChannel0')
-        fg_uniform = glGetUniformLocation(self.shader.blur_program, 'foregroundTexture')
-        use_fg_uniform = glGetUniformLocation(self.shader.blur_program, 'useFG')
+        if ENABLE_SHADERS:
+            glVertexAttribPointer(position_attrib, 3, GL_FLOAT, GL_FALSE, 20, None)
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_TRUE, 20, ctypes.c_void_p(12))
 
         # Render to the screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
@@ -291,35 +284,61 @@ class Renderer:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glNormal3f(0.0, 0.0, 1.0)  # reset normal
 
-        glUseProgram(self.shader.normal_program)
+        if ENABLE_SHADERS:
+            glUseProgram(self.shader.normal_program)
 
         glBindTexture(GL_TEXTURE_2D, self.background)
-        glDrawArrays(GL_QUADS, 0, 4)
+        if ENABLE_SHADERS:
+            glDrawArrays(GL_QUADS, 0, 4)
+        else:
+            glBegin(GL_QUADS)
+            glTexCoord2f(0, 0)
+            glVertex2f(-1.0, -1.0)
+            glTexCoord2f(1, 0)
+            glVertex2f(1.0, -1.0)
+            glTexCoord2f(1, 1)
+            glVertex2f(1.0, 1.0)
+            glTexCoord2f(0, 1)
+            glVertex2f(-1.0, 1.0)
+            glEnd()
 
         max_radius = 10
         step_radius = max_radius / (self.num_blur_layers - 1)
 
-        glUseProgram(self.shader.blur_program)
-        glUniform3f(res_uniform, self.viewport[0], self.viewport[1], 1.0)
-        glUniform1i(tex_uniform, 0)
-        glUniform1i(fg_uniform, 1)
-
-        glUseProgram(self.shader.blur_program)
+        if ENABLE_SHADERS:
+            glUseProgram(self.shader.blur_program)
+            glUniform3f(res_uniform, self.viewport[0], self.viewport[1], 1.0)
+            glUniform1i(tex_uniform, 0)
+            glUniform1i(fg_uniform, 1)
 
         # Draw tile layers
         for i in range(0, self.num_blur_layers):
             center_i = int(self.num_blur_layers / 2)
             radius = abs(center_i - i) * step_radius
-            glUniform1f(radiusUniform, radius)
+            if ENABLE_SHADERS:
+                glUniform1f(radius_uniform, radius)
             glActiveTexture(GL_TEXTURE0)
             glBindTexture(GL_TEXTURE_2D, self.layers[i])
-            if i < self.num_blur_layers - 1:
-                glUniform1f(use_fg_uniform, True)
-                glActiveTexture(GL_TEXTURE1)
-                glBindTexture(GL_TEXTURE_2D, self.layers[i + 1])
+            if ENABLE_SHADERS:
+                if i < self.num_blur_layers - 1:
+                    glUniform1f(use_fg_uniform, True)
+                    glActiveTexture(GL_TEXTURE1)
+                    glBindTexture(GL_TEXTURE_2D, self.layers[i + 1])
+                else:
+                    glUniform1f(use_fg_uniform, False)
+            if ENABLE_SHADERS:
+                glDrawArrays(GL_QUADS, 0, 4)
             else:
-                glUniform1f(use_fg_uniform, False)
-            glDrawArrays(GL_QUADS, 0, 4)
+                glBegin(GL_QUADS)
+                glTexCoord2f(0, 0)
+                glVertex2f(-1.0, -1.0)
+                glTexCoord2f(1, 0)
+                glVertex2f(1.0, -1.0)
+                glTexCoord2f(1, 1)
+                glVertex2f(1.0, 1.0)
+                glTexCoord2f(0, 1)
+                glVertex2f(-1.0, 1.0)
+                glEnd()
         glActiveTexture(GL_TEXTURE0)
 
         # glUseProgram(self.shader.normal_program)
@@ -332,18 +351,34 @@ class Renderer:
         #     glBindTexture(GL_TEXTURE_2D, self.edges_layer)
         #     glDrawArrays(GL_QUADS, 0, 4)
 
-        glUseProgram(self.shader.blur_program)
+        if ENABLE_SHADERS:
+            glUseProgram(self.shader.blur_program)
 
         # Draw prop layers (with entities)
-        glUniform1f(use_fg_uniform, False)
+        if ENABLE_SHADERS:
+            glUniform1f(use_fg_uniform, False)
         for i in range(self.num_blur_layers + 1, self.num_layers):
             center_i = self.num_blur_layers + 2 + int(self.num_blur_layers / 2)
             radius = abs(center_i - i) * step_radius
-            glUniform1f(radiusUniform, radius)
+            if ENABLE_SHADERS:
+                glUniform1f(radius_uniform, radius)
             glBindTexture(GL_TEXTURE_2D, self.layers[i])
-            glDrawArrays(GL_QUADS, 0, 4)
+            if ENABLE_SHADERS:
+                glDrawArrays(GL_QUADS, 0, 4)
+            else:
+                glBegin(GL_QUADS)
+                glTexCoord2f(0, 0)
+                glVertex2f(-1.0, -1.0)
+                glTexCoord2f(1, 0)
+                glVertex2f(1.0, -1.0)
+                glTexCoord2f(1, 1)
+                glVertex2f(1.0, 1.0)
+                glTexCoord2f(0, 1)
+                glVertex2f(-1.0, 1.0)
+                glEnd()
 
-        glUseProgram(0)
+        if ENABLE_SHADERS:
+            glUseProgram(0)
 
         glBindTexture(GL_TEXTURE_2D, 0)
         glDisable(GL_BLEND)
