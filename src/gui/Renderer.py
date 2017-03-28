@@ -10,7 +10,7 @@ from src.gui.Shader import Shader
 from src.gui.objloader import *
 from src.map.Map import *
 
-ENABLE_SHADERS = True
+ENABLE_SHADERS = False
 
 
 class TileModel(Enum):
@@ -351,18 +351,44 @@ class Renderer:
                 glEnd()
         glActiveTexture(GL_TEXTURE0)
 
-        glUseProgram(self.shader.normal_program)
+        if ENABLE_SHADERS:
+            glUseProgram(self.shader.normal_program)
 
         if self.show_edges:
             glBindTexture(GL_TEXTURE_2D, self.layers[self.edges_layer])
-            glDrawArrays(GL_QUADS, 0, 4)
+            if ENABLE_SHADERS:
+                glDrawArrays(GL_QUADS, 0, 4)
+            else:
+                glBegin(GL_QUADS)
+                glTexCoord2f(0, 0)
+                glVertex2f(-1.0, -1.0)
+                glTexCoord2f(1, 0)
+                glVertex2f(1.0, -1.0)
+                glTexCoord2f(1, 1)
+                glVertex2f(1.0, 1.0)
+                glTexCoord2f(0, 1)
+                glVertex2f(-1.0, 1.0)
+                glEnd()
 
         if self.show_grid:
             glBindTexture(GL_TEXTURE_2D, self.grid_layer)
-            glDrawArrays(GL_QUADS, 0, 4)
+            if ENABLE_SHADERS:
+                glDrawArrays(GL_QUADS, 0, 4)
+            else:
+                glBegin(GL_QUADS)
+                glTexCoord2f(0, 0)
+                glVertex2f(-1.0, -1.0)
+                glTexCoord2f(1, 0)
+                glVertex2f(1.0, -1.0)
+                glTexCoord2f(1, 1)
+                glVertex2f(1.0, 1.0)
+                glTexCoord2f(0, 1)
+                glVertex2f(-1.0, 1.0)
+                glEnd()
 
         if ENABLE_SHADERS:
             glUseProgram(self.shader.blur_program)
+
 
         # Draw prop layers (with entities)
         if ENABLE_SHADERS:

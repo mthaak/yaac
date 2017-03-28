@@ -363,7 +363,7 @@ class Entity:
         width, height = map.getSize()
         best_path = (width - 2) * (height - 2)
         return Entity(map, 0, 'rabbit', random.choice(list(RabbitColor)), i, j, random.choice([0, 90, 180, 270]),
-                      alg.edges, 0, best_path)
+                      alg.edges, 0, best_path, True)
 
 
 class RabbitColor(Enum):
