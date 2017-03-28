@@ -79,13 +79,14 @@ class Renderer:
         self.new_entity = None
 
         # Set up data for texture layers
-        self.data = numpy.array([
-            -1.0, 1.0, 0.0, 0, 1.0,
-            -1.0, -1.0, 0.0, 0, 0,
-            1.0, -1.0, 0.0, 1.0, 0,
-            1.0, 1.0, 0.0, 1.0, 1.0,
-        ], dtype=numpy.float32)
-        self.vbo = glvbo.VBO(self.data)
+        if ENABLE_SHADERS:
+            self.data = numpy.array([
+                -1.0, 1.0, 0.0, 0, 1.0,
+                -1.0, -1.0, 0.0, 0, 0,
+                1.0, -1.0, 0.0, 1.0, 0,
+                1.0, 1.0, 0.0, 1.0, 1.0,
+            ], dtype=numpy.float32)
+            self.vbo = glvbo.VBO(self.data)
 
         # Set initial view settings
         glMatrixMode(GL_PROJECTION)
@@ -245,7 +246,8 @@ class Renderer:
                   0.0, 0.0, 1.0)  # up vector
 
     def _draw(self):
-        self.vbo.bind()
+        if ENABLE_SHADERS:
+            self.vbo.bind()
 
         if ENABLE_SHADERS:
             # Prepare the shader
@@ -257,11 +259,11 @@ class Renderer:
             fg_uniform = glGetUniformLocation(self.shader.blur_program, 'foregroundTexture')
             use_fg_uniform = glGetUniformLocation(self.shader.blur_program, 'useFG')
 
-        # Tell OpenGL that the VBO contains an array of vertices
-        glEnableVertexAttribArray(0)
-        glEnableVertexAttribArray(1)
-        # these vertices contain 2 single precision coordinates
         if ENABLE_SHADERS:
+            # Tell OpenGL that the VBO contains an array of vertices
+            glEnableVertexAttribArray(0)
+            glEnableVertexAttribArray(1)
+            # these vertices contain 2 single precision coordinates
             glVertexAttribPointer(position_attrib, 3, GL_FLOAT, GL_FALSE, 20, None)
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_TRUE, 20, ctypes.c_void_p(12))
 
@@ -391,10 +393,11 @@ class Renderer:
         glMatrixMode(GL_MODELVIEW)
         glEnable(GL_DEPTH_TEST)
 
-        self.vbo.unbind()
-        glBindVertexArray(0)
-        glDisableVertexAttribArray(0)
-        glDisableVertexAttribArray(1)
+        if ENABLE_SHADERS:
+            self.vbo.unbind()
+            glBindVertexArray(0)
+            glDisableVertexAttribArray(0)
+            glDisableVertexAttribArray(1)
 
     def _renderGrid(self):
         """Prepares a display list for the grid."""
