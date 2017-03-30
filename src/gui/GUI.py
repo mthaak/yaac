@@ -118,7 +118,7 @@ class GUI:
 
         self.hud.refresh()  # first draw
 
-        self.map.toggleMap()
+        self.map.__init__()
         self.alg.__init__(self.map)
         self.alg.update()  # first update needed to let entities get correct orientation
 
@@ -148,6 +148,9 @@ class GUI:
                 elif e.type == KEYDOWN and e.key == K_m:
                     self.map.toggleMap()
                     self.alg.__init__(self.map)  # reinitiate ACO
+                elif e.type == KEYDOWN and e.key == K_n:
+                    self.map.togglePreviousMap()
+                    self.alg.__init__(self.map)
 
                 # HUD mode select
                 if e.type == KEYDOWN and e.key in [K_ESCAPE, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9]:

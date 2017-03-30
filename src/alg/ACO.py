@@ -11,7 +11,7 @@ class ACO:
         width, height = self.map.getSize()
         best_path = (width - 2) * (height - 2)
         self.entities = [
-            Entity(map, 0, 'rabbit', RabbitColor.WHITE, 2, 1, 0, self.edges, 0, best_path, False),
+            Entity(map, 0, 'rabbit', RabbitColor.WHITE, 1, 1, 0, self.edges, 0, best_path, False),
             Entity(map, 0, 'rabbit', RabbitColor.GREY, 1, 1, 0, self.edges, 0, best_path, False),
             Entity(map, 0, 'rabbit', RabbitColor.BLACK, 1, 1, 0, self.edges, 0, best_path, False),
             Entity(map, 0, 'rabbit', RabbitColor.BROWN, 1, 1, 0, self.edges, 0, best_path, False),
@@ -155,13 +155,14 @@ class Entity:
         self.step_count = 0
         self.way = []
         self.way_back = []
-        # self.startpos = self.map.getStartPos()
-        self.start_pos = [(i, j)]  #
+        self.start_pos = self.map.getStartPos()
+        #self.start_pos = [(i, j)]  #
         self.end_pos = self.map.getEndPos()
         self.prevpos = ()
         self.best_path = best_path
         self.is_lost = is_lost  # whether entity lost its path back to its start
         self.visited_edges = [(i, j)]
+        self.found_food_pos = (0,0) # Used to remember which food of the map is found
 
     def getEdges(self, i, j, edges, prevpos):
         returned_edges = {}
@@ -347,6 +348,7 @@ class Entity:
 
                 if newpos in self.end_pos:
                     self.found_food = 1
+                    self.found_food_pos = newpos
                     path_length = len(self.way_back)
                     self.visited_edges = [self.visited_edges[0]]
                     if path_length < self.best_path:

@@ -4,6 +4,7 @@ from enum import Enum
 
 class Map:
     def __init__(self):
+        self.nr_maps = 4
         self.initMap()
         self.setStartingPoints()
         self.setEndPoints()
@@ -224,6 +225,18 @@ class Map:
             self.largeMap()
         else:
             self.initMap()
+        self.setStartingPoints()
+        self.setEndPoints()
+
+    def togglePreviousMap(self):
+        if self.current_map == 0:
+            self.largeMap()
+        elif self.current_map == 1:
+            self.initMap()
+        elif self.current_map == 2:
+            self.smallMap()
+        else:
+            self.mediumMap()
         self.setStartingPoints()
         self.setEndPoints()
 
@@ -590,12 +603,6 @@ class PropModel(Enum):
                 PropModel.PLANT_2,
                 PropModel.PLANT_3,
                 PropModel.PLANT_4,
-                PropModel.FLOWER_TALL_BLUE,
-                PropModel.FLOWER_BLUE,
-                PropModel.FLOWER_TALL_YELLOW,
-                PropModel.FLOWER_YELLOW,
-                PropModel.FLOWER_RED,
-                PropModel.FLOWER_TALL_RED,
                 PropModel.FLAT_PLANT,
                 PropModel.ROUND_PLANT]
 
