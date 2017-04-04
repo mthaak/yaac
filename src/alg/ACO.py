@@ -158,7 +158,7 @@ class Entity:
         self.way = []
         self.way_back = []
         self.start_pos = self.map.getStartPos()
-        #self.start_pos = [(i, j)]  #
+        self.current_start_pos = (i, j)  # Used to keep track of the current startpoint of each rabbit
         self.end_pos = self.map.getEndPos()
         self.prevpos = ()
         self.best_path = best_path
@@ -289,6 +289,7 @@ class Entity:
                     self.is_lost = False
                     self.visited_edges = [self.visited_edges[0]]
                     self.step_count = 0
+                    self.current_start_pos = newpos
                 else:
                     return True
 
@@ -310,6 +311,7 @@ class Entity:
                     self.found_food = 0
                     self.way_back = []
                     self.way = []
+                    self.current_start_pos = newpos # for testing output
                 return True
             elif self.max_distance_reached == True:
                 path = self.way_back.pop()
