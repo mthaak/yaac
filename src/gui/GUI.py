@@ -103,9 +103,10 @@ class GUI:
         # start_pygame()
 
         pygame.init()
-        self.screen_width, self.screen_height = 1920, 1080
-        viewport = (self.screen_width, self.screen_height)
-        srf = pygame.display.set_mode(viewport, OPENGL | DOUBLEBUF | FULLSCREEN)
+        self.screen_width, self.screen_height = 1080,720
+        viewport = (1020, 720)
+        #viewport = (self.screen_width, self.screen_height)
+        srf = pygame.display.set_mode(viewport, OPENGL | DOUBLEBUF)
         pygame.display.set_caption('YAAC')
         self.clock = pygame.time.Clock()
 
@@ -119,9 +120,11 @@ class GUI:
         self.hud.refresh()  # first draw
 
         self.map.__init__()
-        self.alg.__init__(self.map)
-        self.alg.update()  # first update needed to let entities get correct orientation
+        self.map.toggleMap()
 
+        self.alg.__init__(self.map)
+        self.alg.fixEdgesHole(1, 1, 90)
+        self.alg.update()  # first update needed to let entities get correct orientation
         self.mainloop()  # start main loop
 
     def mainloop(self):
@@ -372,10 +375,10 @@ class GUI:
             # print('render entities -', pygame.time.get_ticks() - ticks)
 
             # Only after move animation is done, the new entity positions are calculated
+
             if move_done:
                 ticks = pygame.time.get_ticks()
                 self.alg.update()
-                self.alg.evaporate()
                 # print('alg -', pygame.time.get_ticks() - ticks)
 
             if pygame.time.get_ticks() % 1000 < self.hud_ticks:
