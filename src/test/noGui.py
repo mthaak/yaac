@@ -7,6 +7,7 @@ alg = ACO(map)
 map.__init__()
 alg.__init__(map)
 
+# Set parameters here.
 max_iterations = 2000
 set_alpha = 10
 set_beta = 10
