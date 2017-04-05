@@ -1,18 +1,16 @@
-from src.alg.ACO import ACO
+from src.alg.ASRanked import *
 from src.map.Map import Map
 
 map = Map()
-alg = ACO(map)
-
-map.__init__()
-alg.__init__(map)
+alg = ASRanked(map)
 
 # Set parameters here.
-max_iterations = 100000
+max_iterations = 10000
 set_alpha = 10
 set_beta = 10
 set_pheromone = 1
 optimal_percentage = 0
+
 
 # Returns the optimal path for a given map, food location, and current home location on this map. Hardcoded.
 def getOptimalPath(map, food_pos, start_pos):
@@ -49,10 +47,16 @@ def getOptimalPath(map, food_pos, start_pos):
             optimalPath = 36
     return optimalPath
 
+
 for i in range(map.nr_maps):
     rabbits = alg.getEntities()
     loop = True
     iterations = 0
+
+    print('Map: ' + ['initMap', 'smallMap', 'mediumMap', 'largeMap'][i])
+    print('Start points: ' + str(map.getStartPos()))
+    print('End points: ' + str(map.getEndPos()))
+    print('Running...')
 
     while loop:
         alg.update()
@@ -64,31 +68,33 @@ for i in range(map.nr_maps):
             rabbit.alpha = set_alpha
             rabbit.beta = set_beta
             rabbit.pherodrop = set_pheromone
-            optimalPath = getOptimalPath(map, rabbit.found_food_pos, rabbit.current_start_pos)
+            optimalPath = getOptimalPath(map, rabbit.found_food_pos, rabbit.initial_start_pos)
             if rabbit.found_food == 1 and rabbit.best_path <= optimalPath:
                 optimalRabbits += 1
         if optimalRabbits == len(rabbits):
             loop = False
         if iterations == max_iterations:
             # prevent infinite looping
-            print('Max iterations reached.')
+            print('Max iterations reached')
             loop = False
         optimal_percentage = optimalRabbits / len(rabbits) * 100
 
-    # Print results.
-    print('Map: ' + str(map.current_map) + ' (0 = initMap, 1 = smallMap, 2 = mediumMap, 3 = largeMap)')
-    print('Startingpoints: ' + str(map.getStartPos()) + ', Food places: ' + str(map.getEndPos()))
-    print('Iterations: ' + str(iterations) + 'Optimal percentage: ' + optimal_percentage)
+    # Print results
+    print('### RESULTS ###')
+    print('Iterations: ' + str(iterations))
+    print('Percentage of rabbits with optimal path: ' + str(optimal_percentage))
     print('found pathlength, optimal pathlength, startpoint, targetpoint, alpha, beta, Pheromone drop')
     for rabbit in rabbits:
         print(' - ' + str(rabbit.color) + ': ' +
               str(rabbit.best_path) + ', ' +
-              str(getOptimalPath(map, rabbit.found_food_pos, rabbit.current_start_pos)) + ', ' +
-              str(rabbit.current_start_pos) + ', ' +
+              str(getOptimalPath(map, rabbit.found_food_pos, rabbit.initial_start_pos)) + ', ' +
+              str(rabbit.initial_start_pos) + ', ' +
               str(rabbit.found_food_pos) + ', ' +
               str(rabbit.alpha) + ', ' +
               str(rabbit.beta) + ', ' +
               str(rabbit.pherodrop))
-    # Go to next map
-    map.toggleMap()
-    alg.__init__(map)
+    print('')
+    if i < 4:
+        # Go to next map
+        map.setMap(i + 1)
+        alg.__init__(map)

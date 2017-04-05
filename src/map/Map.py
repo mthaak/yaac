@@ -178,7 +178,7 @@ class Map:
 
         self.props = [
             Prop(1, 1, 90, PropModel.HOLE),  # start
-            Prop(4, 17, 90, PropModel.HOLE),  # start
+            Prop(4, 17, 270, PropModel.HOLE),  # start
             Prop.randomFood(3, 18),
             Prop.randomFood(15, 12),
             Prop.randomFood(18, 18),
@@ -236,6 +236,18 @@ class Map:
             self.smallMap()
         else:
             self.mediumMap()
+        self.setStartingPoints()
+        self.setEndPoints()
+
+    def setMap(self, map):
+        if map == 0:
+            self.initMap()
+        elif map == 1:
+            self.smallMap()
+        elif map == 2:
+            self.mediumMap()
+        else:
+            self.largeMap()
         self.setStartingPoints()
         self.setEndPoints()
 

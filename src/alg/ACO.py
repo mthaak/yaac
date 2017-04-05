@@ -1,12 +1,15 @@
 import random
 from enum import Enum
 
+from src.map.Map import PropModel
+
 
 class ACO:
     def __init__(self, map):
         self.map = map
 
         self.edges = self.generateEdges()
+        self.fixHoles()
 
         width, height = self.map.getSize()
         best_path = (width - 2) * (height - 2)
@@ -22,6 +25,7 @@ class ACO:
         changed = False
         for entity in self.entities:
             changed |= entity.updatePos()
+        self.evaporate()
         return changed
 
     def placeEntity(self, entity):
@@ -130,12 +134,12 @@ class ACO:
                     edges[(i, j, i, j + 1, 180)] = [1, 0.1]
                 if not self.map.tileBlocked(i - 1, j) and i != 1:
                     edges[(i, j, i - 1, j, 270)] = [1, 0.1]
-                try:
-                    if self.map.getProp(i, j).model.name == 'HOLE':
-                        self.fixEdgesHole(i, j, self.map.getProp(i, j).r)
-                except:
-                    pass
         return edges
+
+    def fixHoles(self):
+        for prop in self.map.getProps():
+            if prop.model == PropModel.HOLE:
+                self.fixEdgesHole(prop.i, prop.j, prop.r)
 
 
 class Entity:
@@ -149,22 +153,22 @@ class Entity:
         self.orient = orient
         self.edges = edges
         self.alpha = 10  # This can be anything, and might be variable
-        self.beta = 10  # This can be anyting, and might be variable
+        self.beta = 10  # This can be anything, and might be variable
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
-        self.max_distance = 10 # if > 0 , the rabbit will return to its home after this many steps
+        self.max_distance = 10  # if > 0 , the rabbit will return to its home after this many steps
         self.max_distance_reached = False
         self.found_food = found_food
         self.step_count = 0
         self.way = []
         self.way_back = []
         self.start_pos = self.map.getStartPos()
-        self.current_start_pos = (i, j)  # Used to keep track of the current startpoint of each rabbit
+        self.initial_start_pos = (i, j)  # Used to keep track of the initial start point of each rabbit
         self.end_pos = self.map.getEndPos()
         self.prevpos = ()
         self.best_path = best_path
         self.is_lost = is_lost  # whether entity lost its path back to its start
         self.visited_edges = [(i, j)]
-        self.found_food_pos = (0,0) # Used to remember which food of the map is found
+        self.found_food_pos = (0, 0)  # Used to remember which food of the map is found
         self.ishome = 1
 
     def getEdges(self, i, j, edges, prevpos):
@@ -196,7 +200,7 @@ class Entity:
         for edge in returned_edges:
             # if the direction is the same, we give the edge a bonus
             if edge[4] == self.orient:
-                returned_edges[edge][0] = returned_edges[edge][0]*1.5
+                returned_edges[edge][0] = returned_edges[edge][0] * 1.5
 
             for n in self.visited_edges:
                 if n == (edge[2], edge[3]):
@@ -289,7 +293,7 @@ class Entity:
                     self.is_lost = False
                     self.visited_edges = [self.visited_edges[0]]
                     self.step_count = 0
-                    self.current_start_pos = newpos
+                    self.initial_start_pos = newpos
                 else:
                     return True
 
@@ -311,7 +315,7 @@ class Entity:
                     self.found_food = 0
                     self.way_back = []
                     self.way = []
-                    self.current_start_pos = newpos # for testing output
+                    self.initial_start_pos = newpos  # for testing output
                 return True
             elif self.max_distance_reached == True:
                 path = self.way_back.pop()
@@ -341,13 +345,19 @@ class Entity:
                 for edge in usable_edges:  # this loop calculates the sum of weighted pheromones of all options
                     k[edge] = usable_edges[edge]
                     weighted_eta = (k[edge][1]) ** self.alpha
-                    weighted_pheromone = (k[edge][0]) ** self.beta
+                    try:
+                        weighted_pheromone = (k[edge][0]) ** self.beta
+                    except OverflowError:
+                        weighted_pheromone = 1 ** self.beta
                     sum_pheromones += (weighted_pheromone * weighted_eta)
                     list_of_candidates.append(edge)
                 for edge in list_of_candidates:  # this loop calculates the probability of the entity taking an edge for every edge
                     k[edge] = usable_edges[edge]
                     weighted_eta = (k[edge][1]) ** self.alpha
-                    weighted_pheromone = (k[edge][0]) ** self.beta
+                    try:
+                        weighted_pheromone = (k[edge][0]) ** self.beta
+                    except OverflowError:
+                        weighted_pheromone = 1 ** self.beta
                     p[edge] = (weighted_pheromone * weighted_eta) / sum_pheromones
                     list_of_probabilities.append(p[edge])
 
@@ -378,8 +388,9 @@ class Entity:
                     if path_length < self.best_path:
                         self.best_path = path_length
                 elif len(self.way_back) == self.max_distance:
-                    self.max_distance_reached = True #Set the max distance reached to True, so the rabbit will go home§
-                    self.visited_edges = [self.visited_edges[0]] #reset the visited edges, so the rabbit starts from scratch
+                    self.max_distance_reached = True  # Set the max distance reached to True, so the rabbit will go home§
+                    self.visited_edges = [
+                        self.visited_edges[0]]  # reset the visited edges, so the rabbit starts from scratch
                 else:
                     return True
 

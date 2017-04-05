@@ -1,12 +1,15 @@
 import random
 from enum import Enum
 
+from src.map.Map import PropModel
+
 
 class MINMAX:
     def __init__(self, map):
         self.map = map
 
         self.edges = self.generateEdges()
+        self.fixHoles()
 
         width, height = self.map.getSize()
         best_path = (width - 2) * (height - 2)
@@ -28,7 +31,7 @@ class MINMAX:
         if sumhome == numberofrabbits:
             self.updatepheromones()
         for entity in self.entities:
-            changed |= entity.updatePos(sumhome==numberofrabbits)
+            changed |= entity.updatePos(sumhome == numberofrabbits)
 
         return changed
 
@@ -39,20 +42,17 @@ class MINMAX:
         lengthpath = len(bestGlobalPath)
 
         for edge in edges:
-            evaporation = edges[edge][1]*(1-rho)
+            evaporation = edges[edge][1] * (1 - rho)
             t_best = 0
             if edge in bestGlobalPath:
-                t_best = 1/lengthpath
+                t_best = 1 / lengthpath
                 # t_best = 1
             edges[edge][1] = (evaporation + t_best)
 
-            if self.edges[edge][1] < 0.1: #minimum
+            if self.edges[edge][1] < 0.1:  # minimum
                 self.edges[edge][1] = 0.1
-            elif self.edges[edge][1] > 5: #maximum
+            elif self.edges[edge][1] > 5:  # maximum
                 self.edges[edge][1] = 5
-
-
-
 
     def placeEntity(self, entity):
         self.entities.append(entity)
@@ -71,8 +71,6 @@ class MINMAX:
                 bestPathLength = len(entity.way)
                 bestPath = entity.way
         return bestPath
-
-
 
     # def evaporate(self):
     #     rho = 0.05  # evaporation rate
@@ -178,6 +176,11 @@ class MINMAX:
                     pass
         return edges
 
+    def fixHoles(self):
+        for prop in self.map.getProps():
+            if prop.model == PropModel.HOLE:
+                self.fixEdgesHole(prop.i, prop.j, prop.r)
+
 
 class Entity:
     def __init__(self, map, index, type, color, i, j, orient, edges, found_food, best_path, is_lost):
@@ -192,20 +195,20 @@ class Entity:
         self.alpha = 10  # This can be anything, and might be variable
         self.beta = 10  # This can be anyting, and might be variable
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
-        self.max_distance = 100 # if > 0 , the rabbit will return to its home after this many steps
+        self.max_distance = 100  # if > 0 , the rabbit will return to its home after this many steps
         self.max_distance_reached = False
         self.found_food = found_food
         self.step_count = 0
         self.way = []
         self.way_back = []
         self.start_pos = self.map.getStartPos()
-        #self.start_pos = [(i, j)]  #
+        self.initial_start_pos = (i, j)  # Used to keep track of the initial start point of each rabbit
         self.end_pos = self.map.getEndPos()
         self.prevpos = ()
         self.best_path = best_path
         self.is_lost = is_lost  # whether entity lost its path back to its start
         self.visited_edges = [(i, j)]
-        self.found_food_pos = (0,0) # Used to remember which food of the map is found
+        self.found_food_pos = (0, 0)  # Used to remember which food of the map is found
         self.ishome = 1
         self.waiting = 0
 
@@ -238,7 +241,7 @@ class Entity:
         for edge in returned_edges:
             # if the direction is the same, we give the edge a bonus
             if edge[4] == self.orient:
-                returned_edges[edge][0] = returned_edges[edge][0]*1.5
+                returned_edges[edge][0] = returned_edges[edge][0] * 1.5
 
             for n in self.visited_edges:
                 if n == (edge[2], edge[3]):
@@ -282,7 +285,6 @@ class Entity:
             elif edges[edge][1] > 5:
                 edges[edge][1] = 5
 
-
     # def straight_path(self, path): #returns the reversed path
     #     a,b,c,d = path[0], path[1], path[2], path[3]
     #     if a == c: # x axis
@@ -297,8 +299,6 @@ class Entity:
     def updatePos(self, allrabbitshome):
         i, j = self.i, self.j
         usable_edges = self.getEdges(i, j, self.edges, self.prevpos)
-
-
 
         if self.type == 'rabbit':
             if self.is_lost == 1:  # rabbit is lost
@@ -349,8 +349,8 @@ class Entity:
 
                 return True
             elif self.found_food == 1:  # FOOD IS FOUND, GO BACK TO STARTING POINT WHILE DROPPING PHEROMONES
-                if self.waiting == 1: #home point is reached, and bunny waits for the other bunnies
-                    if allrabbitshome == 1: #all bunnies home, so now update the pheromones
+                if self.waiting == 1:  # home point is reached, and bunny waits for the other bunnies
+                    if allrabbitshome == 1:  # all bunnies home, so now update the pheromones
                         for path in self.way:
                             try:
                                 self.edges[path][1]
@@ -384,7 +384,7 @@ class Entity:
                     newpos = (path[2], path[3])
                     if newpos in self.start_pos:
                         self.waiting = 1
-                        #self.found_food = 0
+                        # self.found_food = 0
                         self.way_back = []
 
                     return True
@@ -392,7 +392,6 @@ class Entity:
                 path = self.way_back.pop()
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
-
 
                 try:
                     self.edges[reversed_path][1]
@@ -448,13 +447,13 @@ class Entity:
                 newpos = (path[2], path[3])
                 self.visited_edges.append((path[2], path[3]))
 
-                #Check if rabbit is home
+                # Check if rabbit is home
                 if (self.i, self.j) in self.start_pos:
                     self.ishome = 1
                 else:
                     self.ishome = 0
 
-                #Check if the rabbit reached its target
+                # Check if the rabbit reached its target
                 if newpos in self.end_pos:
                     self.found_food = 1
                     self.found_food_pos = newpos
@@ -463,21 +462,16 @@ class Entity:
                     if path_length < self.best_path:
                         self.best_path = path_length
 
-                #check if the rabbit walked its maximum distance
+                # check if the rabbit walked its maximum distance
                 if len(self.way_back) == self.max_distance:
-                    self.max_distance_reached = True #Set the max distance reached to True, so the rabbit will go home§
-                    self.visited_edges = [] #reset the visited edges, so the rabbit starts from scratch
+                    self.max_distance_reached = True  # Set the max distance reached to True, so the rabbit will go home§
+                    self.visited_edges = []  # reset the visited edges, so the rabbit starts from scratch
                 else:
                     return True
 
                 return True
 
-
         return False  # not changed
-
-
-
-
 
     @staticmethod
     def randomRabbit(map, alg, i, j):
