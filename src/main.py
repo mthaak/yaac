@@ -1,7 +1,7 @@
-from src.alg.ASRanked import ASRanked
+from src.alg.EAS2 import EAS2
 from src.gui.GUI import GUI
 from src.map.Map import Map
 
 map = Map()
-alg = ASRanked(map)
+alg = EAS2(map)
 GUI(map, alg)
