@@ -121,7 +121,6 @@ class GUI:
 
         self.map.__init__()
         self.map.toggleMap()
-
         self.alg.__init__(self.map)
         self.alg.fixEdgesHole(1, 1, 90)
         self.alg.update()  # first update needed to let entities get correct orientation

@@ -22,6 +22,7 @@ class ACO:
         changed = False
         for entity in self.entities:
             changed |= entity.updatePos()
+        self.evaporate()
         return changed
 
     def placeEntity(self, entity):
@@ -151,7 +152,7 @@ class Entity:
         self.alpha = 10  # This can be anything, and might be variable
         self.beta = 10  # This can be anyting, and might be variable
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
-        self.max_distance = 10 # if > 0 , the rabbit will return to its home after this many steps
+        self.max_distance = len(edges)/2 # if > 0 , the rabbit will return to its home after this many steps
         self.max_distance_reached = False
         self.found_food = found_food
         self.step_count = 0
@@ -202,6 +203,7 @@ class Entity:
                 if n == (edge[2], edge[3]):
                     returned_edges[edge][0] = returned_edges[edge][0] / 8
         # returned_edges[(0,1,0,1)] = edges[(0,1,0,1)] #replace with workable values
+
         return returned_edges
 
     def weighted_choice(self, choices):
@@ -256,8 +258,7 @@ class Entity:
                 list_of_probabilities = []
                 for edge in usable_edges:  # this loop calculates the sum of weighted pheromones of all options
                     k[edge] = usable_edges[edge]
-                    weighted_eta = (
-                                       1) ** self.alpha  # pheromone level is not taken into account in finding the way back
+                    weighted_eta = (1) ** self.alpha  # pheromone level is not taken into account in finding the way back
                     weighted_pheromone = (k[edge][0]) ** self.beta
                     sum_pheromones += (weighted_pheromone * weighted_eta)
                     list_of_candidates.append(edge)

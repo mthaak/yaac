@@ -218,7 +218,7 @@ class Entity:
         self.alpha = 10  # This can be anything, and might be variable
         self.beta = 10  # This can be anyting, and might be variable
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
-        self.max_distance = 100 # if > 0 , the rabbit will return to its home after this many steps
+        self.max_distance = len(edges)/2 # if > 0 , the rabbit will return to its home after this many steps
         self.max_distance_reached = False
         self.found_food = found_food
         self.step_count = 0
