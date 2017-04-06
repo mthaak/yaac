@@ -1,10 +1,12 @@
 import random
 from enum import Enum
 
+import numpy as np
+
 from src.map.Map import PropModel
 
 
-class ACO:
+class ASRanked:
     def __init__(self, map):
         self.map = map
 
@@ -21,11 +23,51 @@ class ACO:
 
     def update(self):
         changed = False
+        sumhome = 0
+        numberofrabbits = 0
         for entity in self.entities:
-            changed |= entity.updatePos()
+            sumhome += entity.is_waiting
+            numberofrabbits += 1
+        if sumhome == numberofrabbits:
+            self.updatepheromones()
+        for entity in self.entities:
+            changed |= entity.updatePos(sumhome == numberofrabbits)
             entity.is_home = (entity.i, entity.j) == entity.home_pos
-        self.evaporate()
+
         return changed
+
+    def updatepheromones(self):
+        edges = self.edges
+        rho = 0.5  # evaporation rate
+        e = 0.5  # factor for the elitest path
+        Q = 1
+        allpaths, pathranks = self.getAllPaths()
+        lengthallpaths = len(allpaths)
+        bestPath = self.getBestPathTrail()  # best path globally
+        lengthbestpath = len(bestPath)
+
+        for edge in edges:
+            evaporation = edges[edge][1] * (1 - rho)
+            t_e = 0  # edge is on the best path
+            t_k = 0  # edge is on a current solution
+
+            for i in range(1, len(allpaths)):
+
+                rank = pathranks[i]
+                path = allpaths[i]
+                if edge in path:
+                    t_mu = (len(allpaths) - rank) * Q / len(path)
+                    t_k += t_mu
+
+            if edge in bestPath:
+                t_e = len(allpaths) * Q / lengthbestpath
+                # t_best = 1
+            edges[edge][1] = (evaporation + t_k + (e * t_e))
+
+            if self.edges[edge][1] < 0.1:  # minimum
+                self.edges[edge][1] = 0.1
+            elif self.edges[edge][1] > 5:  # maximum
+                self.edges[edge][1] = 5
 
     def placeEntity(self, entity):
         self.entities.append(entity)
@@ -36,15 +78,34 @@ class ACO:
     def getBestPath(self):
         return min([entity.best_path for entity in self.entities])
 
-    def evaporate(self):
-        rho = 0.05  # evaporation rate
-        for edge in self.edges:
-            self.edges[edge][1] *= (1 - rho)
-            if self.edges[edge][1] < 0.1:
-                self.edges[edge][1] = 0.1
-            elif self.edges[edge][1] > 5:
-                self.edges[edge][1] = 5
-        return
+    def getBestPathTrail(self):
+        bestPathLength = 999  # could be set to upper bound
+        bestPath = []
+        for entity in self.entities:
+            if len(entity.best_path_edges) < bestPathLength:
+                bestPathLength = len(entity.way)
+                bestPath = entity.best_path_edges
+        return bestPath
+
+    def getAllPaths(self):
+        allpaths = []
+        pathlengts = []
+        for entity in self.entities:
+            allpaths.append(entity.way)
+            pathlengts.append(len(entity.way))
+        pathlengts = np.array(pathlengts)
+        pathlengts = np.argsort(pathlengts)
+        return allpaths, pathlengts
+
+    # def evaporate(self):
+    #     rho = 0.05  # evaporation rate
+    #     for edge in self.edges:
+    #         self.edges[edge][1] *= (1 - rho)
+    #         if self.edges[edge][1] < 0.1:
+    #             self.edges[edge][1] = 0.1
+    #         elif self.edges[edge][1] > 5:
+    #             self.edges[edge][1] = 5
+    #     return
 
     def fixEdges(self, i, j):
         """After a tile was toggled or a prop was added or removed, we need to fix the edges."""
@@ -151,8 +212,8 @@ class Entity:
         self.j = j
         self.orient = orient
         self.edges = edges
-        self.alpha = 15  # This can be anything, and might be variable
-        self.beta = 2  # This can be anything, and might be variable
+        self.alpha = 10  # This can be anything, and might be variable
+        self.beta = 10  # This can be anyting, and might be variable
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
         self.max_distance = len(edges) / 2  # if > 0 , the rabbit will return to its home after this many steps
         self.max_distance_reached = False
@@ -165,6 +226,7 @@ class Entity:
         self.end_pos = self.map.getEndPos()
         self.prevpos = ()
         self.best_path = (map.getSize()[0] - 2) * (map.getSize()[1] - 2)
+        self.best_path_edges = []
         self.is_lost = is_lost  # whether entity lost its path back to its start
         self.visited_edges = [(i, j)]
         self.food_pos = (0, 0)  # current food of rabbit
@@ -235,6 +297,15 @@ class Entity:
         new_path = (new_i, new_j, i, j, new_orientation)
         return new_path
 
+    def evaporate(self, edges):
+        rho = 0.1  # evaporation rate
+        for edge in edges:
+            edges[edge][1] *= (1 - rho)
+            if edges[edge][1] < 0.1:
+                edges[edge][1] = 0.1
+            elif edges[edge][1] > 5:
+                edges[edge][1] = 5
+
     # def straight_path(self, path): #returns the reversed path
     #     a,b,c,d = path[0], path[1], path[2], path[3]
     #     if a == c: # x axis
@@ -246,7 +317,7 @@ class Entity:
     #             else: #move left
     #     return new_path
 
-    def updatePos(self):
+    def updatePos(self, allrabbitshome):
         i, j = self.i, self.j
         usable_edges = self.getEdges(i, j, self.edges, self.prevpos)
 
@@ -293,33 +364,53 @@ class Entity:
                     self.is_lost = False
                     self.visited_edges = [self.visited_edges[0]]
                     self.step_count = 0
-                    self.home_pos = newpos
                 else:
                     return True
 
                 return True
             elif self.found_food == 1:  # FOOD IS FOUND, GO BACK TO STARTING POINT WHILE DROPPING PHEROMONES
-                path = self.way_back.pop()
-                reversed_path = self.reversed_path(path)
-                self.i, self.j, self.orient = path[2], path[3], path[4]
+                if self.is_waiting == 1:  # home point is reached, and bunny waits for the other bunnies
+                    if allrabbitshome == 1:  # all bunnies home, so now update the pheromones
+                        for path in self.way:
+                            try:
+                                self.edges[path][1]
+                            except KeyError:
+                                print("path removed")
 
-                try:
-                    self.edges[reversed_path][1] += self.pherodrop
-                except KeyError:  # probably an object was placed on reversed path
-                    self.is_lost = True  # TODO have the entity actually be lost and having to find a way back to a home
-                    self.found_food = False
-                    self.visited_edges = [self.visited_edges[0]]
-                    self.way_back = []
-                    self.way = []
-                newpos = (path[2], path[3])
-                if newpos == self.home_pos:
-                    self.found_food = 0
-                    self.way_back = []
-                    self.way = []
-                    self.home_pos = newpos  # for testing output
-                return True
+                        self.found_food = 0
+                        self.is_waiting = 0
+                        self.way = []
+                    return True
+                else:
+                    path = self.way_back.pop()
+                    reversed_path = self.reversed_path(path)
+                    self.i, self.j, self.orient = path[2], path[3], path[4]
+
+                    try:
+                        self.edges[reversed_path][1]
+                    except KeyError:  # probably an object was placed on reversed path
+                        self.is_lost = True  # TODO have the entity actually be lost and having to find a way back to a home
+                        self.found_food = False
+                        self.visited_edges = [self.visited_edges[0]]
+                        self.way_back = []
+
+                    newpos = (path[2], path[3])
+                    if newpos == self.home_pos:
+                        self.is_waiting = 1
+                        # self.found_food = 0
+                        self.way_back = []
+
+                    return True
             elif self.max_distance_reached == True:
-                path = self.way_back.pop()
+                try:
+                    path = self.way_back.pop()
+                except IndexError:
+                    if (self.i, self.j) == self.home_pos:  # we do not know why this can be the case
+                        self.max_distance_reached = False
+                        self.way_back = []
+                        self.way = []
+                        return True
+                    raise
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
 
@@ -347,19 +438,13 @@ class Entity:
                 for edge in usable_edges:  # this loop calculates the sum of weighted pheromones of all options
                     k[edge] = usable_edges[edge]
                     weighted_eta = (k[edge][1]) ** self.alpha
-                    try:
-                        weighted_pheromone = (k[edge][0]) ** self.beta
-                    except OverflowError:
-                        weighted_pheromone = 1 ** self.beta
+                    weighted_pheromone = (k[edge][0]) ** self.beta
                     sum_pheromones += (weighted_pheromone * weighted_eta)
                     list_of_candidates.append(edge)
                 for edge in list_of_candidates:  # this loop calculates the probability of the entity taking an edge for every edge
                     k[edge] = usable_edges[edge]
                     weighted_eta = (k[edge][1]) ** self.alpha
-                    try:
-                        weighted_pheromone = (k[edge][0]) ** self.beta
-                    except OverflowError:
-                        weighted_pheromone = 1 ** self.beta
+                    weighted_pheromone = (k[edge][0]) ** self.beta
                     p[edge] = (weighted_pheromone * weighted_eta) / sum_pheromones
                     list_of_probabilities.append(p[edge])
 
@@ -382,17 +467,20 @@ class Entity:
                 newpos = (path[2], path[3])
                 self.visited_edges.append((path[2], path[3]))
 
+                # Check if the rabbit reached its target
                 if newpos in self.end_pos:
                     self.found_food = 1
                     self.food_pos = newpos
                     path_length = len(self.way_back)
-                    self.visited_edges = [self.visited_edges[0]]
+                    self.visited_edges = [0]
                     if path_length < self.best_path:
                         self.best_path = path_length
-                elif len(self.way_back) == self.max_distance:
-                    self.max_distance_reached = True  # Set the max distance reached to True, so the rabbit will go home§
-                    self.visited_edges = [
-                        self.visited_edges[0]]  # reset the visited edges, so the rabbit starts from scratch
+                        self.best_path_edges = self.way
+
+                # check if the rabbit walked its maximum distance
+                if len(self.way_back) == self.max_distance:
+                    self.max_distance_reached = True  # Set the max distance reached to True, so the rabbit will go home
+                    self.visited_edges = []  # reset the visited edges, so the rabbit starts from scratch
                 else:
                     return True
 

@@ -14,7 +14,8 @@ class HUD:
         self.screen = LaminaScreenSurface(0.985)
 
         self.mode = HUDMode.NONE
-
+        self.map_name = ''
+        self.alg_name = ''
         self.fps = 60
         self.move_frames = 10
 
@@ -64,20 +65,39 @@ class HUD:
         txt = font.render('Toggle between maps (m)', 1, (0, 0, 0))
         self.screen.surf.blit(txt, (200, 130))
 
+        txt = font.render('Previous map (n)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (400, 40))
+        txt = font.render('Next map (m)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (400, 70))
+        txt = font.render('Current map: {0}'.format(self.map_name), 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (400, 100))
+
+        txt = font.render('Previous algorithm (z)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (600, 40))
+        txt = font.render('Next algorithm (x)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (600, 70))
+        txt = font.render('Current algorithm: {0}'.format(self.alg_name), 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (600, 100))
+
         txt = font.render('Number of rabbits: ' + str(len(self.alg.getEntities())), 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (1100, 10))
+        self.screen.surf.blit(txt, (self.viewport[0] - 180, 10))
         txt = font.render('Best path: ' + str(self.alg.getBestPath()), 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (1100, 40))
+        self.screen.surf.blit(txt, (self.viewport[0] - 180, 40))
         txt = font.render('FPS: ' + str(round(self.fps, 2)), 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (1100, 70))
+        self.screen.surf.blit(txt, (self.viewport[0] - 180, 70))
         txt = font.render('Move frames (,.): ' + str(self.move_frames), 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (1100, 100))
+        self.screen.surf.blit(txt, (self.viewport[0] - 180, 100))
 
         self.screen.refresh()
-        # self.screen.refreshPosition()
 
     def getSurface(self):
         return self.screen
+
+    def updateMapName(self, map_name):
+        self.map_name = map_name
+
+    def updateAlgName(self, alg_name):
+        self.alg_name = alg_name
 
     def updateFPS(self, fps):
         self.fps = fps
