@@ -118,6 +118,16 @@ class Renderer:
         # Prepare grid layer
         # self._renderGrid() TODO fix
 
+    def reset(self):
+        self.selected_tile = None
+        self.move_prop = None
+        self.new_prop = None
+        self.old_prop = None
+        self.new_entity = None
+        self.rabbit_anim_frame = 0
+        self.rabbit_anim_counter = 0
+        self.entity_move_frame = 0
+
     def renderHUD(self, screen):
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glDisable(GL_DEPTH_TEST)
@@ -388,7 +398,6 @@ class Renderer:
 
         if ENABLE_SHADERS:
             glUseProgram(self.shader.blur_program)
-
 
         # Draw prop layers (with entities)
         if ENABLE_SHADERS:
@@ -681,6 +690,8 @@ class Renderer:
         for i, entity in enumerate(entities + new_entity):
             if entity.i < 0 or entity.j < 0:  # not allowed
                 continue
+            if hasattr(entity, 'waiting') and entity.waiting:
+                continue  # do not draw if waiting
 
             x, y, z = 3 * entity.i, -3 * entity.j, 0
             layer = self._determineLayer(LayerType.TILES, x, y, z)

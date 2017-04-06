@@ -3,7 +3,10 @@ import sys
 from pygame.constants import *
 from pygame.key import *
 
-from src.alg.ACO import Entity
+from src.alg.ACO import Entity, ACO
+from src.alg.ASRanked import ASRanked
+from src.alg.EAS2 import EAS2
+from src.alg.MINMAX import MINMAX
 from src.gui.HUD import HUD, HUDMode
 from src.gui.Renderer import Renderer
 from src.gui.lamina.lamina import *
@@ -103,9 +106,9 @@ class GUI:
         # start_pygame()
 
         pygame.init()
-        self.screen_width, self.screen_height = 1080,720
+        self.screen_width, self.screen_height = 1080, 720
         viewport = (1020, 720)
-        #viewport = (self.screen_width, self.screen_height)
+        # viewport = (self.screen_width, self.screen_height)
         srf = pygame.display.set_mode(viewport, OPENGL | DOUBLEBUF)
         pygame.display.set_caption('YAAC')
         self.clock = pygame.time.Clock()
@@ -119,10 +122,14 @@ class GUI:
 
         self.hud.refresh()  # first draw
 
-        self.map.__init__()
-        self.map.toggleMap()
-        self.alg.__init__(self.map)
-        self.alg.fixEdgesHole(1, 1, 90)
+        self.map_nr = 0
+        self.alg_nr = 0
+        self.hud.updateAlgName('ACO')
+
+        # self.map.__init__()
+        # self.map.toggleMap()
+        #
+        # self.alg.__init__(self.map)
         self.alg.update()  # first update needed to let entities get correct orientation
         self.mainloop()  # start main loop
 
@@ -131,6 +138,7 @@ class GUI:
             self.clock.tick()
 
             for e in pygame.event.get():
+                changed_alg = False
                 if e.type == QUIT:
                     sys.exit()
 
@@ -148,11 +156,34 @@ class GUI:
                     self.renderer.entity_move_frames += 1
                     self.hud.updateMoveFrames(self.renderer.entity_move_frames)
                 elif e.type == KEYDOWN and e.key == K_m:
-                    self.map.toggleMap()
-                    self.alg.__init__(self.map)  # reinitiate ACO
+                    self.map_nr = (self.map_nr + 1) % 4
+                    self.map.setMap(self.map_nr)
+                    self.alg.__init__(self.map)  # reinitiate alg
                 elif e.type == KEYDOWN and e.key == K_n:
-                    self.map.togglePreviousMap()
-                    self.alg.__init__(self.map)
+                    self.map_nr = (self.map_nr - 1) % 4
+                    self.map.setMap(self.map_nr)
+                    self.alg.__init__(self.map)  # reinitiate alg
+                elif e.type == KEYDOWN and e.key == K_z:
+                    self.alg_nr = (self.alg_nr + 1) % 4
+                    changed_alg = True
+                elif e.type == KEYDOWN and e.key == K_x:
+                    self.alg_nr = (self.alg_nr - 1) % 4
+                    changed_alg = True
+
+                if changed_alg:
+                    if self.alg_nr == 0:
+                        self.alg = ACO(self.map)
+                    if self.alg_nr == 1:
+                        self.alg = ASRanked(self.map)
+                    if self.alg_nr == 2:
+                        self.alg = EAS2(self.map)
+                    if self.alg_nr == 3:
+                        self.alg = MINMAX(self.map)
+                    self.hud.updateAlgName(self.alg.__class__.__name__)
+                    self.map.setMap(self.map_nr)  # reset map
+                    self.renderer.reset()
+                    self.renderer.alg = self.alg
+                    self.alg.update()
 
                 # HUD mode select
                 if e.type == KEYDOWN and e.key in [K_ESCAPE, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9]:
