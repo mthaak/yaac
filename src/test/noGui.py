@@ -1,140 +1,142 @@
-from src.alg.ASRanked import *
-from src.map.Map import Map
+import csv
+import traceback
+from itertools import zip_longest
+
+import numpy as np
+
 from src.alg.ACO import *
+from src.alg.ASRanked import *
 from src.alg.EAS2 import *
 from src.alg.MINMAX import *
-import csv
+from src.map.Map import Map
 
 # Initialization
 map = Map()
-alg1 = ACO(map)
-alg2 = ASRanked(map)
-alg3 = EAS2(map)
-alg4 = MINMAX(map)
-algorithms = [alg1, alg2, alg3, alg4]
 alg_names = ['ACO', 'ASRanked', 'EAS', 'MINMAX']
 map_names = ['initMap', 'smallMap', 'mediumMap', 'largeMap']
 
+# Set parameters here
+MAX_ITERATIONS = 10000
+ITERATIONS_STEP = 10
+NR_TESTS = 3
 
-# Set parameters here.
-max_iterations = 10000
-set_alpha = 10
-set_beta = 10
-set_pheromone = 1
-optimal_percentage = 0
-nr_tests = 10
 
-# Returns the optimal path for a given map, food location, and current home location on this map. Hardcoded.
-def getOptimalPath(map, food_pos, start_pos):
-    optimalPath = 0
-    if map.current_map == 0:
-        optimalPath = 13
-    elif map.current_map == 1:
-        optimalPath = 14
-    elif map.current_map == 2:
-        # optimal for respectively (2, 13), (3, 8), (13, 2), and (13, 13)
+def get_optimal_path(map_nr, home_pos, food_pos):
+    """Returns the optimal path for a given map, home location and food location. Hardcoded."""
+    if map_nr == 0:
+        return 13
+    elif map_nr == 1:
+        return 14
+    elif map_nr == 2:
+        # Optimal for respectively (2, 13), (3, 8), (13, 2), and (13, 13)
         if food_pos == (2, 13) or food_pos == (3, 8):
-            optimalPath = 15
+            return 15
         elif food_pos == (13, 2):
-            optimalPath = 19
+            return 19
         elif food_pos == (13, 13):
-            optimalPath = 24
-    elif map.current_map == 3:
+            return 24
+    elif map_nr == 3:
         # Optimal for respectively (3, 18), (14, 13), (18, 18)
-        if food_pos == (3, 18) and start_pos == (1, 1):
-            optimalPath = 19
-        elif food_pos == (15, 12) and start_pos == (1, 1):
-            optimalPath = 27
-        elif food_pos == (18, 18) and start_pos == (1, 1):
-            optimalPath = 34
-        elif food_pos == (16, 3) and start_pos == (1, 1):
-            optimalPath = 21
-        elif food_pos == (3, 18) and start_pos == (4, 17):
-            optimalPath = 2
-        elif food_pos == (15, 12) and start_pos == (4, 17):
-            optimalPath = 38
-        elif food_pos == (18, 18) and start_pos == (4, 17):
-            optimalPath = 39
-        elif food_pos == (16, 3) and start_pos == (4, 17):
-            optimalPath = 36
-    return optimalPath
+        if food_pos == (3, 18) and home_pos == (1, 1):
+            return 19
+        elif food_pos == (15, 12) and home_pos == (1, 1):
+            return 27
+        elif food_pos == (18, 18) and home_pos == (1, 1):
+            return 34
+        elif food_pos == (16, 3) and home_pos == (1, 1):
+            return 21
+        elif food_pos == (3, 18) and home_pos == (4, 17):
+            return 2
+        elif food_pos == (15, 12) and home_pos == (4, 17):
+            return 38
+        elif food_pos == (18, 18) and home_pos == (4, 17):
+            return 39
+        elif food_pos == (16, 3) and home_pos == (4, 17):
+            return 36
+    return 0
 
-# Prepare csv file
-with open('testResults.csv', 'w', newline='') as csvfile:
-    writer = csv.writer(csvfile, delimiter=',')
-    k = -1
-    for alg in algorithms:
-        k += 1
-        writer.writerow(['Algorithm', 'Map', 'Alpha', 'Beta', 'Pheromone drop'])
-        for i in range(map.nr_maps):
-            avg_iterations = 0
-            avg_percentage = 0
-            writer.writerow([alg_names[k]] + [map_names[i]] + [str(set_alpha)] + [str(set_beta)] + [str(set_pheromone)])
-            writer.writerow(['Test', 'Iterations', 'Percentage of rabbits with optimal path'])
-            for j in range(nr_tests):
-                rabbits = alg.getEntities()
-                loop = True
-                iterations = 0
 
-                # Print details to console
-                print('Algorithm: ' + alg_names[k])
-                print('Test nr: ' + str(j))
-                print('Map: ' + map_names[i])
-                print('Start points: ' + str(map.getStartPos()))
-                print('End points: ' + str(map.getEndPos()))
-                print('Running...')
+def calc_nr_entities_optimal_path(entities):
+    """Returns the number of entities that has found the optimal path from their home to some food."""
+    return sum([entity.best_path == get_optimal_path(map_nr, entity.home_pos, entity.food_pos) for entity in entities])
 
-                while loop:
-                    alg.update()
-                    iterations += 1
-                    optimalRabbits = 0
-                    # When all rabbits have found an optimal path, stop looping
-                    for rabbit in rabbits:
-                        # Set parameter values
-                        rabbit.alpha = set_alpha
-                        rabbit.beta = set_beta
-                        rabbit.pherodrop = set_pheromone
-                        optimalPath = getOptimalPath(map, rabbit.found_food_pos, rabbit.initial_start_pos)
-                        if rabbit.found_food == 1 and rabbit.best_path <= optimalPath:
-                            optimalRabbits += 1
-                    if optimalRabbits == len(rabbits):
-                        loop = False
-                    if iterations == max_iterations:
-                        # prevent infinite looping
-                        print('Max iterations reached')
-                        loop = False
-                    optimal_percentage = optimalRabbits / len(rabbits) * 100
 
-                # Update statistics
-                avg_iterations += iterations
-                avg_percentage += optimal_percentage
+def run_test(map_nr, alg_nr, alpha=1, beta=1, pheromone=1, max_iterations=10000):
+    # Set map and algorithm
+    map.setMap(map_nr)
+    if alg_nr == 0:
+        alg = ACO(map)
+    elif alg_nr == 1:
+        alg = ASRanked(map)
+    elif alg_nr == 2:
+        alg = EAS2(map)
+    elif alg_nr == 3:
+        alg = MINMAX(map)
 
-                # Print results to console
-                print('### RESULTS ###')
-                print('Iterations: ' + str(iterations))
-                print('Percentage of rabbits with optimal path: ' + str(optimal_percentage))
-                print('found pathlength, optimal pathlength, startpoint, targetpoint, alpha, beta, Pheromone drop')
-                for rabbit in rabbits:
-                    print(' - ' + str(rabbit.color) + ': ' +
-                          str(rabbit.best_path) + ', ' +
-                          str(getOptimalPath(map, rabbit.found_food_pos, rabbit.initial_start_pos)) + ', ' +
-                          str(rabbit.initial_start_pos) + ', ' +
-                          str(rabbit.found_food_pos) + ', ' +
-                          str(rabbit.alpha) + ', ' +
-                          str(rabbit.beta) + ', ' +
-                          str(rabbit.pherodrop))
-                print('')
+    entities = alg.getEntities()
 
-                # Write results to CSV file
-                writer.writerow([str(j)] + [str(iterations)] + [str(optimal_percentage)])
+    # Set entity parameters
+    for entity in entities:
+        entity.alpha = alpha
+        entity.beta = beta
+        entity.pherodrop = pheromone
 
-            # Calculate and write average results
-            avg_iterations /= nr_tests
-            avg_percentage /= nr_tests
-            writer.writerow(['Tests', 'Iterations avg', 'Percentage avg'])
-            writer.writerow([str(nr_tests)] + [(str(avg_iterations))] + [str(avg_percentage)])
+    best_paths = [entities[0].best_path]  # list of best paths per ITERATIONS_STEP
 
-            if i < 4:
-                # Go to next map
-                map.setMap(i + 1)
-                alg.__init__(map)
+    # Perform iterations
+    iterations = 0
+    while calc_nr_entities_optimal_path(entities) < len(entities) and iterations < max_iterations:
+        alg.update()
+        iterations += 1
+        if iterations % ITERATIONS_STEP == 0:
+            best_path = min([entity.best_path for entity in entities])
+            best_paths.append(best_path)
+
+    nr_entities_optimal_path = calc_nr_entities_optimal_path(entities)
+    return iterations, best_paths, nr_entities_optimal_path
+
+
+with open('results.csv', 'w', newline='') as results_file:
+    writer = csv.writer(results_file, delimiter=',')
+
+    writer.writerow(['map', 'alg', 'alpha', 'beta', 'pheromone',
+                     'iterations_mean', 'iterations_var',
+                     'best_path_mean', 'best_path_var',
+                     'nr_entities_best_path_mean', 'nr_entities_best_path_var'])
+
+    alpha, beta, pheromone = 1, 1, 1
+
+    for map_nr, map_name in enumerate(map_names):
+        for alg_nr, alg_name in enumerate(alg_names):
+            iterations_list, best_paths_list, nr_entities_optimal_path_list = [], [], []
+            for test_nr in range(NR_TESTS):
+                print('Running test: {0}, {1}, {2} ... '.format(map_name, alg_name, test_nr), end='')
+                try:
+                    iterations, best_paths, nr_entities_optimal_path = run_test(map_nr, alg_nr,
+                                                                                max_iterations=MAX_ITERATIONS)
+                    iterations_list.append(iterations)
+                    best_paths_list.append(best_paths)
+                    nr_entities_optimal_path_list.append(nr_entities_optimal_path)
+                    print('success')
+                except Exception as err:
+                    print('failed')
+                    print(traceback.format_exc())
+
+            best_path_list = [best_paths[-1] for best_paths in best_paths_list]
+            # Write averages and variances
+            writer.writerow([map_name, alg_name, alpha, beta, pheromone,
+                             round(np.mean(iterations_list), 5), round(np.var(iterations_list), 5),
+                             round(np.mean(best_path_list), 5), round(np.var(best_path_list), 5),
+                             round(np.mean(nr_entities_optimal_path_list), 5),
+                             round(np.var(nr_entities_optimal_path_list), 5)])
+
+            # Write specific map x alg file with best_path per ITERATIONS_STEP
+            file_name = map_name + '_' + alg_name + '.csv'
+            with open(file_name, 'w', newline='') as best_path_file:
+                writer2 = csv.writer(best_path_file, delimiter=',')
+                writer2.writerow(['iterations', 'best_path_mean', 'best_path_var'])
+                for iteration, best_path_per_iter in enumerate(zip_longest(*best_paths_list)):
+                    best_path_per_iter_no_none = [best_path for best_path in best_path_per_iter if best_path]
+                    writer2.writerow([str(iteration * ITERATIONS_STEP),
+                                      round(np.mean(best_path_per_iter_no_none), 5),
+                                      round(np.var(best_path_per_iter_no_none), 5)])

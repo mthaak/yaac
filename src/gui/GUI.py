@@ -106,30 +106,24 @@ class GUI:
         # start_pygame()
 
         pygame.init()
-        self.screen_width, self.screen_height = 1080, 720
-        viewport = (1020, 720)
-        # viewport = (self.screen_width, self.screen_height)
+        self.screen_width, self.screen_height = 1020, 720
+        viewport = (self.screen_width, self.screen_height)
         srf = pygame.display.set_mode(viewport, OPENGL | DOUBLEBUF)
         pygame.display.set_caption('YAAC')
         self.clock = pygame.time.Clock()
 
         self.renderer = Renderer(viewport, map, alg)
+
         self.hud = HUD(viewport, map, alg)
-        self.hud_ticks = 500  # refresh time for hud
+        self.hud.refresh()  # first draw
         self.hud_refreshed = False
 
         self.moving_prop = False  # whether a prop is being moved
 
-        self.hud.refresh()  # first draw
-
         self.map_nr = 0
         self.alg_nr = 0
-        self.hud.updateAlgName('ACO')
 
-        # self.map.__init__()
-        # self.map.toggleMap()
-        #
-        # self.alg.__init__(self.map)
+        self.hud.updateAlgName(self.alg.__class__.__name__)
         self.alg.update()  # first update needed to let entities get correct orientation
         self.mainloop()  # start main loop
 
@@ -396,28 +390,16 @@ class GUI:
                 else:
                     self.renderer.old_prop = None
 
-            # Render
-            ticks = pygame.time.get_ticks()
             self.renderer.render()
-            # print('render map -', pygame.time.get_ticks() - ticks)
 
-            move_done = self.renderer.isAnimationDone()
-            # print('render entities -', pygame.time.get_ticks() - ticks)
-
-            # Only after move animation is done, the new entity positions are calculated
-
-            if move_done:
-                ticks = pygame.time.get_ticks()
+            if self.renderer.isAnimationDone():
                 self.alg.update()
-                # print('alg -', pygame.time.get_ticks() - ticks)
 
-            if pygame.time.get_ticks() % 1000 < self.hud_ticks:
+            if pygame.time.get_ticks() % 500 < 250:
                 if not self.hud_refreshed:
-                    ticks = pygame.time.get_ticks()
                     self.hud.updateFPS(self.clock.get_fps())
                     self.hud.refresh()
                     self.hud_refreshed = True
-                    # print('hud -', pygame.time.get_ticks() - ticks)
             else:
                 self.hud_refreshed = False
 

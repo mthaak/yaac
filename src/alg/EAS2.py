@@ -219,22 +219,22 @@ class Entity:
         self.alpha = 10  # This can be anything, and might be variable
         self.beta = 10  # This can be anyting, and might be variable
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
-        self.max_distance = 100  # if > 0 , the rabbit will return to its home after this many steps
+        self.max_distance = len(edges) / 2  # if > 0 , the rabbit will return to its home after this many steps
         self.max_distance_reached = False
         self.found_food = found_food
         self.step_count = 0
         self.way = []
         self.way_back = []
         self.start_pos = self.map.getStartPos()
-        self.initial_start_pos = (i, j)  # Used to keep track of the initial start point of each rabbit
+        self.home_pos = (i, j)  # current home of rabbit
         self.end_pos = self.map.getEndPos()
         self.prevpos = ()
         self.best_path = best_path
         self.best_path_edges = []
         self.is_lost = is_lost  # whether entity lost its path back to its start
         self.visited_edges = [(i, j)]
-        self.found_food_pos = (0, 0)  # Used to remember which food of the map is found
-        self.ishome = 1
+        self.food_pos = (0, 0)  # current food of rabbit
+        self.is_home = 1
         self.waiting = 0
 
     def getEdges(self, i, j, edges, prevpos):
@@ -368,7 +368,7 @@ class Entity:
                     self.is_lost = False
                     self.visited_edges = [self.visited_edges[0]]
                     self.step_count = 0
-                    self.ishome = 1
+                    self.is_home = 1
                 else:
                     return True
 
@@ -394,9 +394,9 @@ class Entity:
 
                     # Check if rabbit is home
                     if (self.i, self.j) in self.start_pos:
-                        self.ishome = 1
+                        self.is_home = 1
                     else:
-                        self.ishome = 0
+                        self.is_home = 0
 
                     try:
                         self.edges[reversed_path][1]
@@ -431,7 +431,7 @@ class Entity:
                     self.max_distance_reached = False
                     self.way_back = []
                     self.way = []
-                    self.ishome = 1
+                    self.is_home = 1
                 return True
             elif usable_edges:
                 k = {}
@@ -474,14 +474,14 @@ class Entity:
 
                 # Check if rabbit is home
                 if (self.i, self.j) in self.start_pos:
-                    self.ishome = 1
+                    self.is_home = 1
                 else:
-                    self.ishome = 0
+                    self.is_home = 0
 
                 # Check if the rabbit reached its target
                 if newpos in self.end_pos:
                     self.found_food = 1
-                    self.found_food_pos = newpos
+                    self.food_pos = newpos
                     path_length = len(self.way_back)
                     self.visited_edges = [0]
                     if path_length < self.best_path:
