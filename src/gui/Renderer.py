@@ -10,7 +10,7 @@ from src.gui.Shader import Shader
 from src.gui.objloader import *
 from src.map.Map import *
 
-ENABLE_SHADERS = False
+ENABLE_SHADERS = True
 
 
 class TileModel(Enum):

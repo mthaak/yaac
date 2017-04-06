@@ -130,6 +130,8 @@ with open('results.csv', 'w', newline='') as results_file:
 
     for map_nr, map_name in enumerate(map_names):
         for alg_nr, alg_name in enumerate(alg_names):
+            if alg_nr != 0:
+                continue
             for alpha in drange(0, 2.0, ALPHA_BETA_STEP):
                 beta = 2.0 - alpha
                 iterations_list, best_paths_list, nr_entities_optimal_path_list, optimal_path = [], [], [], 0
