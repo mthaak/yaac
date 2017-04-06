@@ -1,0 +1,31 @@
+alg:
+    - maximale afstand dat konijntjes van huis mogen gaan
+    X wanneer de terugweg van een konijn wordt versperd, moet hij in terug naar huis modus gaan
+    - edge verwijderen die zijwaarts uit hole komt
+    - uitputtelijke etensbronnen
+    X meerdere holes ondersteunen
+    X cyclussen voorkomen
+    X naar links/rechts gaan bestraffen
+
+HUD:
+    number of rabbits
+    best path length
+    alg parameters
+        alpha
+        beta
+        max wander distance
+    animation speed
+
+place rabbit
+
+start position
+    - interact
+
+nicer graphics:
+    x shaders
+    x better background
+    - shadows
+    - moving sun
+    - ambient occlusion
+    x depth of field
+    - motion blur

@@ -7,10 +7,12 @@ from OpenGL.GLU import *
 
 from src.alg.ACO import RabbitColor
 from src.gui.Shader import Shader
+from src.gui.cgtypes import *
 from src.gui.objloader import *
 from src.map.Map import *
 
-ENABLE_SHADERS = False
+global ENABLE_SHADERS
+ENABLE_SHADERS = True
 
 
 class TileModel(Enum):
@@ -46,12 +48,13 @@ class Renderer:
         self.show_edges = True
 
         width, height = map.getSize()
-        self.center_x = width / 2 * 3
-        self.center_y = height / 2 * -3
+        self.center_x = 3 * width / 2
+        self.center_y = -3 * height / 2
+        self.center_z = 0.3
         self.phi, self.theta = 90, 350  # used for camera position
         self.zpos = 15  # camera zoom
 
-        self.background = self._texFromPNG('res/sky.png')
+        self.background_texture = self._texFromPNG('res/sky.png')
 
         self.tile_models = {}
         self.tile_models_mono = {}  # monocolored tiles
@@ -89,16 +92,16 @@ class Renderer:
             self.vbo = glvbo.VBO(self.data)
 
         # Set initial view settings
+        glDisable(GL_CULL_FACE)
+        glEnable(GL_DEPTH_TEST)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        width, height = viewport
         gluPerspective(90.0, width / float(height), 1, 100.0)
-        glEnable(GL_DEPTH_TEST)
         glMatrixMode(GL_MODELVIEW)
-        glViewport(0, 0, self.viewport[0], self.viewport[1])
 
         # Initialise OpenGL settings
-        glLightfv(GL_LIGHT0, GL_POSITION, (-40, 200, 100, 0.0))
+        self.light_x, self.light_y, self.light_z = 20, 20, 20
+        glLightfv(GL_LIGHT0, GL_POSITION, (self.light_x, self.light_y, self.light_z, 0.0))
         glLightfv(GL_LIGHT0, GL_AMBIENT, (0.2, 0.2, 0.2, 1.0))
         glLightfv(GL_LIGHT0, GL_DIFFUSE, (0.5, 0.5, 0.5, 1.0))
         glEnable(GL_LIGHT0)
@@ -115,6 +118,9 @@ class Renderer:
         self.framebuffer, self.layers = self._createFrameBuffer(self.num_layers)
         self.current_layer = 0  # user for decreasing number of layer changes
 
+        # Prepare shadows
+        self.depth_framebuffer, self.depth_texture = self._createDepthFramebuffer()
+
         # Prepare grid layer
         # self._renderGrid() TODO fix
 
@@ -125,34 +131,9 @@ class Renderer:
         screen.display()
         glEnable(GL_DEPTH_TEST)
 
-    def renderLayers(self, selectedTile=None, selectedProp=None, redProp=None, greenProp=None):
-        """Renders all the layers."""
-        glEnable(GL_DEPTH_TEST)
-
-        glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer)
-        glViewport(0, 0, self.viewport[0], self.viewport[1])
-
-        # Clear layers
-        for i in range(self.num_layers):
-            self._changeLayer(i)
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
-        glColor(1.0, 1.0, 1.0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-
-        glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer)
-
-        if self.show_edges:
-            self._renderEdges()
-
-        self._renderTiles(select=selectedTile)
-
-        self._renderProps()
-
-        self._renderEntities()
-
     def render(self):
-        self.renderLayers()
+        # self._renderDepthMap()
+        self._renderLayers()
         self._draw()
 
     def isAnimationDone(self):
@@ -212,10 +193,10 @@ class Renderer:
             layers.append(texture)
 
         # The depth buffer
-        depthrenderbuffer = glGenRenderbuffers(1)
-        glBindRenderbuffer(GL_RENDERBUFFER, depthrenderbuffer)
+        depth_render_buffer = glGenRenderbuffers(1)
+        glBindRenderbuffer(GL_RENDERBUFFER, depth_render_buffer)
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, self.viewport[0], self.viewport[1])
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthrenderbuffer)
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_render_buffer)
 
         # Set colour attachment #0
         glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, layers[0], 0)
@@ -228,6 +209,44 @@ class Renderer:
             return False
 
         return framebuffer, layers
+
+    def _createDepthFramebuffer(self):
+        # The framebuffer, which regroups 0, 1, or more textures, and 0 or 1 depth buffer.
+        framebuffer = glGenFramebuffers(1)
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer)
+
+        # Depth texture. Slower than a depth buffer, but you can sample it later in your shader
+        depth_texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, depth_texture)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depth_texture, 0)
+
+        glDrawBuffer(GL_NONE)  # No color buffer is drawn to.
+
+        # Always check that our framebuffer is ok
+        if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+            return False
+
+        return framebuffer, depth_texture
+
+    def _calcLightMVP(self):
+        width, height = self.map.getSize()
+        self.center_x = 3 * width / 2
+        self.center_y = -3 * height / 2
+        self.center_z = 0.3
+        lightInvDir = vec3(self.light_x, self.light_y, self.light_z)
+
+        # Compute the MVP matrix from the light's point of view
+        depthProjectionMatrix = mat4.orthographic(-10, 10, -10, 10, -10, 20)
+        depthViewMatrix = mat4.lookAt(lightInvDir, vec3(self.center_x, self.center_y, self.center_z), vec3(0, 0, 1))
+        depthModelMatrix = mat4(1.0)
+        lightMVP = depthProjectionMatrix * depthViewMatrix * depthModelMatrix
+        return lightMVP
 
     def _resetCamera(self):
         """Sets the view such that it looks at the center of the map from the sky."""
@@ -245,12 +264,125 @@ class Renderer:
                   self.center_x, self.center_y, self.center_z,  # look at point
                   0.0, 0.0, 1.0)  # up vector
 
+    def _resetCameraLight(self):
+        """Sets the camera to the position of the light."""
+        glLoadIdentity()
+        width, height = self.map.getSize()
+        self.center_x = 3 * width / 2
+        self.center_y = -3 * height / 2
+        self.center_z = 0.3
+        gluLookAt(self.light_x, self.light_y, self.light_z,
+                  self.center_x, self.center_y, self.center_z,
+                  0.0, 0.0, 1.0)
+
+    def _setOrtho(self):
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glLoadIdentity()
+        glOrtho(-10, 10, -10, 10, -10, 20)
+        glPushMatrix()
+        glMatrixMode(GL_MODELVIEW)
+
+    def _setPersp(self):
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glLoadIdentity()
+        width, height = self.viewport
+        gluPerspective(90.0, width / float(height), 1, 100.0)
+        glPushMatrix()
+        glMatrixMode(GL_MODELVIEW)
+
+    def _renderDepthMap(self):
+        if ENABLE_SHADERS:
+            glBindFramebuffer(GL_FRAMEBUFFER, self.depth_framebuffer)
+            glViewport(0, 0, 1024, 1024)
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+            # self._setOrtho()
+            self._resetCameraLight()
+
+            glUseProgram(self.shader.depth_program)
+
+            self._renderProps(False)
+
+            self._renderEntities(False)
+
+            glUseProgram(0)
+
+    def _renderLayers(self):
+        """Renders all the layers."""
+        glEnable(GL_DEPTH_TEST)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer)
+        glViewport(0, 0, self.viewport[0], self.viewport[1])
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+        # Clear layers
+        for i in range(self.num_layers):
+            self._changeLayer(i)
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        glUseProgram(0)
+
+        self._resetCamera()
+
+        # Render edges without shadows
+        if self.show_edges:
+            self._renderEdges(True)
+
+        # # if ENABLE_SHADERS:
+        #     glUseProgram(self.shader.shadow_program)
+        #
+        #     lightMVP = self._calcLightMVP()
+        #     biasMatrix = mat4([
+        #         0.5, 0.0, 0.0, 0.0,
+        #         0.0, 0.5, 0.0, 0.0,
+        #         0.0, 0.0, 0.5, 0.0,
+        #         0.5, 0.5, 0.5, 1.0
+        #     ])
+        #
+        #     depthBiasMVP = biasMatrix * lightMVP
+        #
+        #     # MatrixID = glGetUniformLocation(self.shader.shadow_program, "MVP")
+        #     # inverseMVPID = glGetUniformLocation(self.shader.shadow_program, "inverseMVP")
+        #     DepthBiasID = glGetUniformLocation(self.shader.shadow_program, "DepthBiasMVP")
+        #     ShadowMapID = glGetUniformLocation(self.shader.shadow_program, "shadowMap")
+        #
+        #     # Send our transformation to the currently bound shader, in the "MVP" uniform
+        #     # glUniformMatrix4fv(inverseMVPID, 1, GL_FALSE, inverseCameraMVP[0][0])
+        #     glUniformMatrix4fv(DepthBiasID, 1, GL_FALSE, depthBiasMVP[0][0])  # Bind our texture in Texture Unit 0
+        #     # glActiveTexture(GL_TEXTURE0);
+        #     # glBindTexture(GL_TEXTURE_2D, Texture);
+        #     # # Set our "myTextureSampler" sampler to user Texture Unit 0
+        #     # glUniform1i(TextureID, 0);
+        #
+        #     glActiveTexture(GL_TEXTURE1)
+        #     glBindTexture(GL_TEXTURE_2D, self.depth_texture)
+        #     glUniform1i(ShadowMapID, 1)
+
+        self._resetCamera()
+
+        self._renderTiles(True)
+
+        self._resetCamera()
+
+        self._renderProps(True)
+
+        self._resetCamera()
+
+        self._renderEntities(True)
+
+        if ENABLE_SHADERS:
+            glUseProgram(0)
+
     def _draw(self):
         if ENABLE_SHADERS:
             self.vbo.bind()
 
         if ENABLE_SHADERS:
             # Prepare the shader
+            glUseProgram(self.shader.blur_program)
             position_attrib = glGetAttribLocation(self.shader.blur_program, 'position')
             coords_attrib = glGetAttribLocation(self.shader.blur_program, 'texCoords')
             res_uniform = glGetUniformLocation(self.shader.blur_program, 'iResolution')
@@ -291,7 +423,8 @@ class Renderer:
         if ENABLE_SHADERS:
             glUseProgram(self.shader.normal_program)
 
-        glBindTexture(GL_TEXTURE_2D, self.background)
+        # Draw background
+        glBindTexture(GL_TEXTURE_2D, self.background_texture)
         if ENABLE_SHADERS:
             glDrawArrays(GL_QUADS, 0, 4)
         else:
@@ -389,7 +522,6 @@ class Renderer:
         if ENABLE_SHADERS:
             glUseProgram(self.shader.blur_program)
 
-
         # Draw prop layers (with entities)
         if ENABLE_SHADERS:
             glUniform1f(use_bg_uniform, False)
@@ -448,8 +580,6 @@ class Renderer:
 
         self._changeLayer(self.grid_layer)
 
-        self._resetCamera()
-
         glLineWidth(1.0)
         glColor3f(1.0, 0.0, 0.0)
         # Draw grid
@@ -486,13 +616,11 @@ class Renderer:
         glDisable(GL_BLEND)
         glDisable(GL_TEXTURE_2D)
 
-    def _renderEdges(self):
+    def _renderEdges(self, layered):
         edges = self.alg.edges
 
-        self._changeLayer(self.edges_layer)  # TODO fix hack
-        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, self.layers[self.edges_layer], 0)
-
-        self._resetCamera()
+        if layered:
+            self._changeLayer(self.edges_layer)
 
         glLineWidth(1.0)
         glDisable(GL_DEPTH_TEST)
@@ -530,19 +658,15 @@ class Renderer:
         glEnable(GL_LIGHTING)
         glEnable(GL_DEPTH_TEST)
 
-    def _renderTiles(self, select=None, pick=False):
+    def _renderTiles(self, layered, pick=False):
         """Renders the tiles.
         :type select: tuple (i,j), the selected tile
         :type pick: boolean, whether a tile was picked so that every tile should get a different color
         """
-        self._resetCamera()
-
         if pick:
             glDisable(GL_TEXTURE_2D)
             glDisable(GL_LIGHTING)
             self.colorToTile = {}
-
-        glDisable(GL_CULL_FACE)
 
         width, height = self.map.getSize()
         for j in range(height):
@@ -567,14 +691,14 @@ class Renderer:
                     glColor3ub(*color)
                     self.colorToTile[color] = (i, j)
                     glCallList(self.tile_models_mono[model_id].gl_list)  # draw mono tile model
-                elif select == (i, j):
-                    glDisable(GL_LIGHTING)  # so that tile gets a slightly different shade (depends on angle though)
-                    glCallList(self.tile_models[model_id].gl_list)  # draw tile model
-                    glEnable(GL_LIGHTING)
+                elif self.selected_tile == (i, j):
+                    glColor3f(1.0, 1.0, 1.0)
+                    glCallList(self.tile_models_mono[model_id].gl_list)  # draw tile model
                 else:
-                    x, y, z = 3 * i, -3 * j, 0
-                    layer = self._determineLayer(LayerType.TILES, x, y, z)
-                    self._changeLayer(layer)
+                    if layered:
+                        x, y, z = 3 * i, -3 * j, 0
+                        layer = self._determineLayer(LayerType.TILES, x, y, z)
+                        self._changeLayer(layer)
                     glCallList(self.tile_models[model_id].gl_list)  # draw tile model
 
                 if model_id == TileModel.CLIFF_TOP_DIRT \
@@ -597,9 +721,7 @@ class Renderer:
             glEnable(GL_LIGHTING)
             glEnable(GL_TEXTURE_2D)
 
-    def _renderProps(self, pick=False):
-        self._resetCamera()
-
+    def _renderProps(self, layered, pick=False):
         props = self.map.getProps()
         if self.move_prop and type(self.move_prop) == Prop:
             selected_prop = [self.move_prop]
@@ -636,8 +758,9 @@ class Renderer:
                 self.colorToProp[color] = (prop.i, prop.j)
                 glCallList(self.prop_models_mono[prop.model].gl_list)  # draw mono prop model
             else:
-                layer = self._determineLayer(LayerType.PROPS_ENTITIES, x, y, z)
-                self._changeLayer(layer)
+                if layered:
+                    layer = self._determineLayer(LayerType.PROPS_ENTITIES, x, y, z)
+                    self._changeLayer(layer)
                 if self.move_prop and \
                         ((type(self.move_prop) == tuple
                           and prop.i == self.move_prop[0] and prop.j == self.move_prop[1])
@@ -666,7 +789,7 @@ class Renderer:
             glEnable(GL_LIGHTING)
             glEnable(GL_TEXTURE_2D)
 
-    def _renderEntities(self):
+    def _renderEntities(self, layered):
         """Renders all the entities."""
         entities = self.alg.getEntities()
         if self.new_entity:
@@ -674,19 +797,18 @@ class Renderer:
         else:
             new_entity = []
 
-        self._resetCamera()
-
         scale = 0.05
         dev_x, dev_y = 1.5, -1.5
         for i, entity in enumerate(entities + new_entity):
             if entity.i < 0 or entity.j < 0:  # not allowed
                 continue
 
-            x, y, z = 3 * entity.i, -3 * entity.j, 0
-            layer = self._determineLayer(LayerType.TILES, x, y, z)
-            self._changeLayer(layer)
+            x, y, z = 3 * entity.i, -3 * entity.j, 0.25
+            if layered:
+                layer = self._determineLayer(LayerType.TILES, x, y, z)
+                self._changeLayer(layer)
 
-            glTranslate(3 * entity.i, -3 * entity.j, 0.25)
+            glTranslate(x, y, z)
 
             glRotate(-entity.orient, 0, 0, 1)
 

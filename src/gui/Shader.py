@@ -16,19 +16,22 @@ class Shader:
                 elif filename.endswith('frag.glsl'):
                     shaders[filename] = self._compile_fragment_shader(source)
 
+        self.simple_program = self._link_shader_program(shaders['simple.vert.glsl'],
+                                                        shaders['simple.frag.glsl'])
         self.normal_program = self._link_shader_program(shaders['vertex_shader.vert.glsl'],
                                                         shaders['fragment_shader.frag.glsl'])
-        self.blur_program = self._link_shader_program(shaders['vertex_shader.vert.glsl'],
-                                                      shaders['blur_shader2.frag.glsl'])
+        self.blur_program = self._link_shader_program(shaders['blur_shader.vert.glsl'],
+                                                      shaders['blur_shader.frag.glsl'])
+        self.depth_program = self._link_shader_program(shaders['depth.vert.glsl'],
+                                                       shaders['depth.frag.glsl'])
+        self.shadow_program = self._link_shader_program(shaders['shadow.vert.glsl'],
+                                                        shaders['shadow.frag.glsl'])
 
     def useProgram(self, program):
         if program == 'blur':
             glUseProgram(self.blur_program)
         elif not program:
             glUseProgram(0)
-
-    def setBlur(self):
-        pass
 
     @staticmethod
     def _get_shader_source(filename):
