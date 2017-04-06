@@ -151,8 +151,8 @@ class Entity:
         self.j = j
         self.orient = orient
         self.edges = edges
-        self.alpha = 10  # This can be anything, and might be variable
-        self.beta = 10  # This can be anything, and might be variable
+        self.alpha = 15  # This can be anything, and might be variable
+        self.beta = 2  # This can be anything, and might be variable
         self.pherodrop = 1  # the amount of pheromones that is dropped when food is found
         self.max_distance = len(edges) / 2  # if > 0 , the rabbit will return to its home after this many steps
         self.max_distance_reached = False
@@ -302,6 +302,7 @@ class Entity:
                 path = self.way_back.pop()
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
+
                 try:
                     self.edges[reversed_path][1] += self.pherodrop
                 except KeyError:  # probably an object was placed on reversed path
@@ -318,14 +319,7 @@ class Entity:
                     self.home_pos = newpos  # for testing output
                 return True
             elif self.max_distance_reached == True:
-                try:
-                    path = self.way_back.pop()
-                except IndexError:
-                    self.is_lost = True
-                    self.max_distance_reached = False
-                    self.way_back = []
-                    self.way = []
-                    return True
+                path = self.way_back.pop()
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
 

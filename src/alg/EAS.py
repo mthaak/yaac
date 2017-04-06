@@ -183,11 +183,6 @@ class EAS:
                     edges[(i, j, i, j + 1, 180)] = [1, 0.1]
                 if not self.map.tileBlocked(i - 1, j) and i != 1:
                     edges[(i, j, i - 1, j, 270)] = [1, 0.1]
-                try:
-                    if self.map.getProp(i, j).model.name == 'HOLE':
-                        self.fixEdgesHole(i, j, self.map.getProp(i, j).r)
-                except:
-                    pass
         return edges
 
     def fixHoles(self):

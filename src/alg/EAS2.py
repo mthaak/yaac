@@ -192,11 +192,6 @@ class EAS2:
                     edges[(i, j, i, j + 1, 180)] = [1, 0.1]
                 if not self.map.tileBlocked(i - 1, j) and i != 1:
                     edges[(i, j, i - 1, j, 270)] = [1, 0.1]
-                try:
-                    if self.map.getProp(i, j).model.name == 'HOLE':
-                        self.fixEdgesHole(i, j, self.map.getProp(i, j).r)
-                except:
-                    pass
         return edges
 
     def fixHoles(self):
@@ -385,7 +380,6 @@ class Entity:
                         self.way = []
                     return True
                 else:
-
                     path = self.way_back.pop()
                     reversed_path = self.reversed_path(path)
                     self.i, self.j, self.orient = path[2], path[3], path[4]
@@ -409,11 +403,12 @@ class Entity:
                 try:
                     path = self.way_back.pop()
                 except IndexError:
-                    self.is_lost = True
-                    self.max_distance_reached = False
-                    self.way_back = []
-                    self.way = []
-                    return True
+                    if (self.i, self.j) == self.home_pos:  # we do not know why this can be the case
+                        self.max_distance_reached = False
+                        self.way_back = []
+                        self.way = []
+                        return True
+                    raise
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
 

@@ -106,7 +106,7 @@ class GUI:
         # start_pygame()
 
         pygame.init()
-        self.screen_width, self.screen_height = 1020, 720
+        self.screen_width, self.screen_height = 1080, 720
         viewport = (self.screen_width, self.screen_height)
         srf = pygame.display.set_mode(viewport, OPENGL | DOUBLEBUF)
         pygame.display.set_caption('YAAC')
