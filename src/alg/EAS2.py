@@ -432,6 +432,7 @@ class Entity:
                     self.visited_edges = [self.visited_edges[0]]
                     self.way_back = []
                     self.way = []
+                    return True
                 newpos = (path[2], path[3])
                 if newpos in self.start_pos:
                     self.max_distance_reached = False
