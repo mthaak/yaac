@@ -11,14 +11,12 @@ class MINMAX:
         self.edges = self.generateEdges()
         self.fixHoles()
 
-        width, height = self.map.getSize()
-        best_path = (width - 2) * (height - 2)
         self.entities = [
-            Entity(map, 0, 'rabbit', RabbitColor.WHITE, 1, 1, 0, self.edges, 0, best_path, False),
-            Entity(map, 0, 'rabbit', RabbitColor.GREY, 1, 1, 0, self.edges, 0, best_path, False),
-            Entity(map, 0, 'rabbit', RabbitColor.BLACK, 1, 1, 0, self.edges, 0, best_path, False),
-            Entity(map, 0, 'rabbit', RabbitColor.BROWN, 1, 1, 0, self.edges, 0, best_path, False),
-            Entity(map, 0, 'rabbit', RabbitColor.BEIGE, 1, 1, 0, self.edges, 0, best_path, False)
+            Entity(map, 0, 'rabbit', RabbitColor.WHITE, 1, 1, 0, self.edges, 0, False),
+            Entity(map, 0, 'rabbit', RabbitColor.GREY, 1, 1, 0, self.edges, 0, False),
+            Entity(map, 0, 'rabbit', RabbitColor.BLACK, 1, 1, 0, self.edges, 0, False),
+            Entity(map, 0, 'rabbit', RabbitColor.BROWN, 1, 1, 0, self.edges, 0, False),
+            Entity(map, 0, 'rabbit', RabbitColor.BEIGE, 1, 1, 0, self.edges, 0, False)
         ]
 
     def update(self):
@@ -183,7 +181,7 @@ class MINMAX:
 
 
 class Entity:
-    def __init__(self, map, index, type, color, i, j, orient, edges, found_food, best_path, is_lost):
+    def __init__(self, map, index, type, color, i, j, orient, edges, found_food, is_lost):
         self.map = map
         self.index = index
         self.type = 'rabbit'  # TODO create other possibilities
@@ -205,7 +203,7 @@ class Entity:
         self.home_pos = (i, j)  # current home of rabbit
         self.end_pos = self.map.getEndPos()
         self.prevpos = ()
-        self.best_path = best_path
+        self.best_path = (map.getSize()[0] - 2) * (map.getSize()[1] - 2)
         self.is_lost = is_lost  # whether entity lost its path back to its start
         self.visited_edges = [(i, j)]
         self.food_pos = (0, 0)  # current food of rabbit
@@ -382,7 +380,7 @@ class Entity:
                         self.way_back = []
 
                     newpos = (path[2], path[3])
-                    if newpos in self.start_pos:
+                    if newpos == self.home_pos:
                         self.is_waiting = 1
                         # self.found_food = 0
                         self.way_back = []
@@ -409,7 +407,7 @@ class Entity:
                     self.way_back = []
                     self.way = []
                 newpos = (path[2], path[3])
-                if newpos in self.start_pos:
+                if newpos == self.home_pos:
                     self.max_distance_reached = False
                     self.way_back = []
                     self.way = []
@@ -482,10 +480,8 @@ class Entity:
 
     @staticmethod
     def randomRabbit(map, alg, i, j):
-        width, height = map.getSize()
-        best_path = (width - 2) * (height - 2)
         return Entity(map, 0, 'rabbit', random.choice(list(RabbitColor)), i, j, random.choice([0, 90, 180, 270]),
-                      alg.edges, 0, best_path, True)
+                      alg.edges, 0, True)
 
 
 class RabbitColor(Enum):

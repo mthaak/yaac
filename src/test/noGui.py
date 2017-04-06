@@ -2,8 +2,6 @@ import csv
 import traceback
 from itertools import zip_longest
 
-import numpy as np
-
 from src.alg.ACO import *
 from src.alg.ASRanked import *
 from src.alg.EAS2 import *
@@ -100,9 +98,9 @@ with open('results.csv', 'w', newline='') as results_file:
     writer = csv.writer(results_file, delimiter=',')
 
     writer.writerow(['map', 'alg', 'alpha', 'beta', 'pheromone',
-                     'iterations_mean', 'iterations_var',
-                     'best_path_mean', 'best_path_var',
-                     'nr_entities_best_path_mean', 'nr_entities_best_path_var'])
+                     'iterations_mean', 'iterations_std',
+                     'best_path_mean', 'best_path_std',
+                     'nr_entities_best_path_mean', 'nr_entities_best_path_std'])
 
     alpha, beta, pheromone = 1, 1, 1
 
@@ -117,26 +115,26 @@ with open('results.csv', 'w', newline='') as results_file:
                     iterations_list.append(iterations)
                     best_paths_list.append(best_paths)
                     nr_entities_optimal_path_list.append(nr_entities_optimal_path)
-                    print('success')
+                    print('success ({0} iterations)'.format(iterations))
                 except Exception as err:
                     print('failed')
                     print(traceback.format_exc())
 
             best_path_list = [best_paths[-1] for best_paths in best_paths_list]
-            # Write averages and variances
+            # Write averages and standard deviations
             writer.writerow([map_name, alg_name, alpha, beta, pheromone,
-                             round(np.mean(iterations_list), 5), round(np.var(iterations_list), 5),
-                             round(np.mean(best_path_list), 5), round(np.var(best_path_list), 5),
+                             round(np.mean(iterations_list), 5), round(np.std(iterations_list), 5),
+                             round(np.mean(best_path_list), 5), round(np.std(best_path_list), 5),
                              round(np.mean(nr_entities_optimal_path_list), 5),
-                             round(np.var(nr_entities_optimal_path_list), 5)])
+                             round(np.std(nr_entities_optimal_path_list), 5)])
 
             # Write specific map x alg file with best_path per ITERATIONS_STEP
             file_name = map_name + '_' + alg_name + '.csv'
             with open(file_name, 'w', newline='') as best_path_file:
                 writer2 = csv.writer(best_path_file, delimiter=',')
-                writer2.writerow(['iterations', 'best_path_mean', 'best_path_var'])
+                writer2.writerow(['iterations', 'best_path_mean', 'best_path_std'])
                 for iteration, best_path_per_iter in enumerate(zip_longest(*best_paths_list)):
                     best_path_per_iter_no_none = [best_path for best_path in best_path_per_iter if best_path]
                     writer2.writerow([str(iteration * ITERATIONS_STEP),
                                       round(np.mean(best_path_per_iter_no_none), 5),
-                                      round(np.var(best_path_per_iter_no_none), 5)])
+                                      round(np.std(best_path_per_iter_no_none), 5)])
