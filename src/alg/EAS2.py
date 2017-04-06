@@ -412,7 +412,13 @@ class Entity:
 
                     return True
             elif self.max_distance_reached == True:
-                path = self.way_back.pop()
+                try:
+                    path = self.way_back.pop()
+                except IndexError:
+                    self.is_lost = True
+                    self.max_distance_reached = False
+                    self.way_back = []
+                    self.way = []
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
 
