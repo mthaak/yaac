@@ -419,6 +419,7 @@ class Entity:
                     self.max_distance_reached = False
                     self.way_back = []
                     self.way = []
+                    return True
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
 
