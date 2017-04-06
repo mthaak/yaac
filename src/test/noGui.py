@@ -10,8 +10,9 @@ from src.map.Map import Map
 
 # Initialization
 map = Map()
-alg_names = ['ACO', 'ASRanked', 'EAS', 'MINMAX']
 map_names = ['initMap', 'smallMap', 'mediumMap', 'largeMap']
+alg_names = ['ACO', 'ASRanked', 'EAS', 'MINMAX']
+
 
 # Set parameters here
 MAX_ITERATIONS = 10000
@@ -54,6 +55,11 @@ def get_optimal_path(map_nr, home_pos, food_pos):
     return 0
 
 
+def calc_optimal_path(map_nr, home_pos):
+    food_list = [prop for prop in map.getProps() if prop.model in PropModel.food()]
+    return min([get_optimal_path(map_nr, home_pos, (food.i, food.j)) for food in food_list])
+
+
 def calc_nr_entities_optimal_path(entities):
     """Returns the number of entities that has found the optimal path from their home to some food."""
     return sum([entity.best_path == get_optimal_path(map_nr, entity.home_pos, entity.food_pos) for entity in entities])
@@ -79,7 +85,7 @@ def run_test(map_nr, alg_nr, alpha=1, beta=1, pheromone=1, max_iterations=10000)
         entity.beta = beta
         entity.pherodrop = pheromone
 
-    best_paths = [entities[0].best_path]  # list of best paths per ITERATIONS_STEP
+    avg_best_paths = [entities[0].best_path]  # list of best paths per ITERATIONS_STEP
 
     # Perform iterations
     iterations = 0
@@ -87,18 +93,28 @@ def run_test(map_nr, alg_nr, alpha=1, beta=1, pheromone=1, max_iterations=10000)
         alg.update()
         iterations += 1
         if iterations % ITERATIONS_STEP == 0:
-            best_path = min([entity.best_path for entity in entities])
-            best_paths.append(best_path)
+            avg_best_path = sum([entity.best_path for entity in entities]) / len(entities)
+            avg_best_paths.append(avg_best_path)
+
+    # Write last ITERATION_STEP as well
+    if iterations < max_iterations:
+        temp_iterations = iterations
+        while temp_iterations % ITERATIONS_STEP != 0:
+            alg.update()
+            temp_iterations += 1
+        avg_best_path = sum([entity.best_path for entity in entities]) / len(entities)
+        avg_best_paths.append(avg_best_path)
 
     nr_entities_optimal_path = calc_nr_entities_optimal_path(entities)
-    return iterations, best_paths, nr_entities_optimal_path
+    optimal_path = calc_optimal_path(map_nr, entities[0].home_pos)  # all entities have same home pos
+    return iterations, avg_best_paths, nr_entities_optimal_path, optimal_path
 
 
 with open('results.csv', 'w', newline='') as results_file:
     writer = csv.writer(results_file, delimiter=',')
 
-    writer.writerow(['map', 'alg', 'alpha', 'beta', 'pheromone',
-                     'iterations_mean', 'iterations_std',
+    writer.writerow(['map', 'alg', 'alpha', 'beta', 'pheromone', 'opt_path'
+                                                                 'iterations_mean', 'iterations_std',
                      'best_path_mean', 'best_path_std',
                      'nr_entities_best_path_mean', 'nr_entities_best_path_std'])
 
@@ -106,23 +122,24 @@ with open('results.csv', 'w', newline='') as results_file:
 
     for map_nr, map_name in enumerate(map_names):
         for alg_nr, alg_name in enumerate(alg_names):
-            iterations_list, best_paths_list, nr_entities_optimal_path_list = [], [], []
+            iterations_list, best_paths_list, nr_entities_optimal_path_list, optimal_path = [], [], [], 0
             for test_nr in range(NR_TESTS):
                 print('Running test: {0}, {1}, {2} ... '.format(map_name, alg_name, test_nr), end='')
                 try:
-                    iterations, best_paths, nr_entities_optimal_path = run_test(map_nr, alg_nr,
-                                                                                max_iterations=MAX_ITERATIONS)
+                    iterations, best_paths, nr_entities_optimal_path, optimal_path = run_test(map_nr, alg_nr,
+                                                                                              max_iterations=MAX_ITERATIONS)
                     iterations_list.append(iterations)
                     best_paths_list.append(best_paths)
                     nr_entities_optimal_path_list.append(nr_entities_optimal_path)
                     print('success ({0} iterations)'.format(iterations))
                 except Exception as err:
-                    print('failed')
+                    print('failed: ')
                     print(traceback.format_exc())
 
             best_path_list = [best_paths[-1] for best_paths in best_paths_list]
+
             # Write averages and standard deviations
-            writer.writerow([map_name, alg_name, alpha, beta, pheromone,
+            writer.writerow([map_name, alg_name, alpha, beta, pheromone, optimal_path,
                              round(np.mean(iterations_list), 5), round(np.std(iterations_list), 5),
                              round(np.mean(best_path_list), 5), round(np.std(best_path_list), 5),
                              round(np.mean(nr_entities_optimal_path_list), 5),
@@ -132,9 +149,10 @@ with open('results.csv', 'w', newline='') as results_file:
             file_name = map_name + '_' + alg_name + '.csv'
             with open(file_name, 'w', newline='') as best_path_file:
                 writer2 = csv.writer(best_path_file, delimiter=',')
-                writer2.writerow(['iterations', 'best_path_mean', 'best_path_std'])
-                for iteration, best_path_per_iter in enumerate(zip_longest(*best_paths_list)):
-                    best_path_per_iter_no_none = [best_path for best_path in best_path_per_iter if best_path]
+                writer2.writerow(['iterations', 'avg_best_path_mean', 'avg_best_path_std'])
+                for iteration, avg_best_path_per_iter in enumerate(zip_longest(*best_paths_list)):
+                    avg_best_path_per_iter_no_none = [best_path if best_path else optimal_path for best_path in
+                                                      avg_best_path_per_iter]
                     writer2.writerow([str(iteration * ITERATIONS_STEP),
-                                      round(np.mean(best_path_per_iter_no_none), 5),
-                                      round(np.std(best_path_per_iter_no_none), 5)])
+                                      round(np.mean(avg_best_path_per_iter_no_none), 5),
+                                      round(np.std(avg_best_path_per_iter_no_none), 5)])

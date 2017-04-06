@@ -26,12 +26,13 @@ class ASRanked:
         sumhome = 0
         numberofrabbits = 0
         for entity in self.entities:
-            sumhome += entity.waiting
+            sumhome += entity.is_waiting
             numberofrabbits += 1
         if sumhome == numberofrabbits:
             self.updatepheromones()
         for entity in self.entities:
             changed |= entity.updatePos(sumhome == numberofrabbits)
+            entity.is_home = (entity.i, entity.j) == entity.home_pos
 
         return changed
 
@@ -234,8 +235,8 @@ class Entity:
         self.is_lost = is_lost  # whether entity lost its path back to its start
         self.visited_edges = [(i, j)]
         self.food_pos = (0, 0)  # current food of rabbit
-        self.is_home = 1
-        self.waiting = 0
+        self.is_home = True
+        self.is_waiting = False
 
     def getEdges(self, i, j, edges, prevpos):
         returned_edges = {}
@@ -368,13 +369,12 @@ class Entity:
                     self.is_lost = False
                     self.visited_edges = [self.visited_edges[0]]
                     self.step_count = 0
-                    self.is_home = 1
                 else:
                     return True
 
                 return True
             elif self.found_food == 1:  # FOOD IS FOUND, GO BACK TO STARTING POINT WHILE DROPPING PHEROMONES
-                if self.waiting == 1:  # home point is reached, and bunny waits for the other bunnies
+                if self.is_waiting == 1:  # home point is reached, and bunny waits for the other bunnies
                     if allrabbitshome == 1:  # all bunnies home, so now update the pheromones
                         for path in self.way:
                             try:
@@ -383,20 +383,13 @@ class Entity:
                                 print("path removed")
 
                         self.found_food = 0
-                        self.waiting = 0
+                        self.is_waiting = 0
                         self.way = []
                     return True
                 else:
-
                     path = self.way_back.pop()
                     reversed_path = self.reversed_path(path)
                     self.i, self.j, self.orient = path[2], path[3], path[4]
-
-                    # Check if rabbit is home
-                    if (self.i, self.j) in self.start_pos:
-                        self.is_home = 1
-                    else:
-                        self.is_home = 0
 
                     try:
                         self.edges[reversed_path][1]
@@ -408,7 +401,7 @@ class Entity:
 
                     newpos = (path[2], path[3])
                     if newpos == self.home_pos:
-                        self.waiting = 1
+                        self.is_waiting = 1
                         # self.found_food = 0
                         self.way_back = []
 
@@ -438,7 +431,6 @@ class Entity:
                     self.max_distance_reached = False
                     self.way_back = []
                     self.way = []
-                    self.is_home = 1
                 return True
             elif usable_edges:
                 k = {}
@@ -478,12 +470,6 @@ class Entity:
 
                 newpos = (path[2], path[3])
                 self.visited_edges.append((path[2], path[3]))
-
-                # Check if rabbit is home
-                if (self.i, self.j) in self.start_pos:
-                    self.is_home = 1
-                else:
-                    self.is_home = 0
 
                 # Check if the rabbit reached its target
                 if newpos in self.end_pos:

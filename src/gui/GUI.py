@@ -10,7 +10,7 @@ from src.alg.MINMAX import MINMAX
 from src.gui.HUD import HUD, HUDMode
 from src.gui.Renderer import Renderer
 from src.gui.lamina.lamina import *
-from src.map.Map import Prop
+from src.map.Map import Prop, PropModel
 
 
 def start_pygame():
@@ -123,8 +123,10 @@ class GUI:
         self.map_nr = 0
         self.alg_nr = 0
 
+        self.hud.updateMapName(['initMap', 'smallMap', 'mediumMap', 'largeMap'][self.map_nr])
         self.hud.updateAlgName(self.alg.__class__.__name__)
         self.alg.update()  # first update needed to let entities get correct orientation
+        # self.renderer.updateGrid() # TODO fix
         self.mainloop()  # start main loop
 
     def mainloop(self):
@@ -152,10 +154,12 @@ class GUI:
                 elif e.type == KEYDOWN and e.key == K_m:
                     self.map_nr = (self.map_nr + 1) % 4
                     self.map.setMap(self.map_nr)
+                    self.hud.updateMapName(['initMap', 'smallMap', 'mediumMap', 'largeMap'][self.map_nr])
                     self.alg.__init__(self.map)  # reinitiate alg
                 elif e.type == KEYDOWN and e.key == K_n:
                     self.map_nr = (self.map_nr - 1) % 4
                     self.map.setMap(self.map_nr)
+                    self.hud.updateMapName(['initMap', 'smallMap', 'mediumMap', 'largeMap'][self.map_nr])
                     self.alg.__init__(self.map)  # reinitiate alg
                 elif e.type == KEYDOWN and e.key == K_z:
                     self.alg_nr = (self.alg_nr + 1) % 4
@@ -285,7 +289,12 @@ class GUI:
                                 if tile is not None and not self.map.tileOccupied(*tile) and not self.alg.tileOccupied(
                                         *tile):
                                     self.map.placeProp(self.renderer.move_prop)
-                                    self.alg.fixEdges(*tile)
+                                    if self.renderer.move_prop.model == PropModel.HOLE:
+                                        self.map.addStartPos(*tile)
+                                        hole = self.renderer.move_prop
+                                        self.alg.fixEdgesHole(hole.i, hole.j, hole.r)
+                                    else:
+                                        self.alg.fixEdges(*tile)
                                     self.renderer.move_prop = (-1, -1)
                                     self.moving_prop = False
                             else:
@@ -297,6 +306,8 @@ class GUI:
                                 if tile is not None:
                                     self.renderer.move_prop = self.map.getProp(*tile)
                                     self.map.removeProp(*tile)
+                                    if self.renderer.move_prop.model == PropModel.HOLE:
+                                        self.map.removeStartPos(*tile)
                                     self.alg.fixEdges(*tile)
                                     self.moving_prop = True
                         elif self.hud.mode == HUDMode.DELETE:

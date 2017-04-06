@@ -23,6 +23,7 @@ class ACO:
         changed = False
         for entity in self.entities:
             changed |= entity.updatePos()
+            entity.is_home = (entity.i, entity.j) == entity.home_pos
         self.evaporate()
         return changed
 
@@ -167,7 +168,8 @@ class Entity:
         self.is_lost = is_lost  # whether entity lost its path back to its start
         self.visited_edges = [(i, j)]
         self.food_pos = (0, 0)  # current food of rabbit
-        self.is_home = 1
+        self.is_home = True
+        self.is_waiting = False
 
     def getEdges(self, i, j, edges, prevpos):
         returned_edges = {}
@@ -316,9 +318,17 @@ class Entity:
                     self.home_pos = newpos  # for testing output
                 return True
             elif self.max_distance_reached == True:
-                path = self.way_back.pop()
+                try:
+                    path = self.way_back.pop()
+                except IndexError:
+                    self.is_lost = True
+                    self.max_distance_reached = False
+                    self.way_back = []
+                    self.way = []
+                    return True
                 reversed_path = self.reversed_path(path)
                 self.i, self.j, self.orient = path[2], path[3], path[4]
+
                 try:
                     self.edges[reversed_path][1]
                 except KeyError:  # probably an object was placed on reversed path
@@ -393,8 +403,6 @@ class Entity:
                     return True
 
                 return True
-            if (self.i, self.j) in self.start_pos:
-                self.is_home = 1
 
         return False  # not changed
 

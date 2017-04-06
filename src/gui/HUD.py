@@ -14,10 +14,10 @@ class HUD:
         self.screen = LaminaScreenSurface(0.985)
 
         self.mode = HUDMode.NONE
-
+        self.map_name = ''
+        self.alg_name = ''
         self.fps = 60
         self.move_frames = 10
-        self.alg_name = ''
 
     def refresh(self):
         self.screen.clear()
@@ -61,17 +61,21 @@ class HUD:
         txt = font.render('Show edges (e)', 1, (0, 0, 0))
         self.screen.surf.blit(txt, (200, 70))
         txt = font.render('Print map in console (p)', 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (200, 100))       
-        txt = font.render('Toggle previous map (n)', 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (200, 130))
-        txt = font.render('Toggle next map (m)', 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (200, 160))
-        txt = font.render('Toggle previous map algorithm (z)', 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (200, 190))
-        txt = font.render('Toggle next map algorithm (x)', 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (200, 220))
+        self.screen.surf.blit(txt, (200, 100))
+
+        txt = font.render('Previous map (n)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (400, 40))
+        txt = font.render('Next map (m)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (400, 70))
+        txt = font.render('Current map: {0}'.format(self.map_name), 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (400, 100))
+
+        txt = font.render('Previous algorithm (z)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (600, 40))
+        txt = font.render('Next algorithm (x)', 1, (0, 0, 0))
+        self.screen.surf.blit(txt, (600, 70))
         txt = font.render('Current algorithm: {0}'.format(self.alg_name), 1, (0, 0, 0))
-        self.screen.surf.blit(txt, (200, 250))
+        self.screen.surf.blit(txt, (600, 100))
 
         txt = font.render('Number of rabbits: ' + str(len(self.alg.getEntities())), 1, (0, 0, 0))
         self.screen.surf.blit(txt, (self.viewport[0] - 180, 10))
@@ -87,11 +91,14 @@ class HUD:
     def getSurface(self):
         return self.screen
 
-    def updateFPS(self, fps):
-        self.fps = fps
+    def updateMapName(self, map_name):
+        self.map_name = map_name
 
     def updateAlgName(self, alg_name):
         self.alg_name = alg_name
+
+    def updateFPS(self, fps):
+        self.fps = fps
 
     def updateMoveFrames(self, move_frames):
         self.move_frames = move_frames

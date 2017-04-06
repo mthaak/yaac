@@ -115,9 +115,6 @@ class Renderer:
         self.framebuffer, self.layers = self._createFrameBuffer(self.num_layers)
         self.current_layer = 0  # user for decreasing number of layer changes
 
-        # Prepare grid layer
-        # self._renderGrid() TODO fix
-
     def reset(self):
         self.selected_tile = None
         self.move_prop = None
@@ -198,9 +195,8 @@ class Renderer:
     def toggleShowEdges(self):
         self.show_edges = not self.show_edges
 
-    def mapSizeChanged(self):
-        glBindFramebuffer(GL_FRAMEBUFFER, self.framebuffer)
-        # self._renderGrid()
+    def updateGrid(self):
+        self._renderGrid()
 
     def _createFrameBuffer(self, num_layers=1):
         framebuffer = glGenFramebuffers(1)
@@ -380,21 +376,22 @@ class Renderer:
                 glVertex2f(-1.0, 1.0)
                 glEnd()
 
-        if self.show_grid:
-            glBindTexture(GL_TEXTURE_2D, self.grid_layer)
-            if ENABLE_SHADERS:
-                glDrawArrays(GL_QUADS, 0, 4)
-            else:
-                glBegin(GL_QUADS)
-                glTexCoord2f(0, 0)
-                glVertex2f(-1.0, -1.0)
-                glTexCoord2f(1, 0)
-                glVertex2f(1.0, -1.0)
-                glTexCoord2f(1, 1)
-                glVertex2f(1.0, 1.0)
-                glTexCoord2f(0, 1)
-                glVertex2f(-1.0, 1.0)
-                glEnd()
+        # TODO fix - does not do anything
+        # if self.show_grid:
+        #     glBindTexture(GL_TEXTURE_2D, self.layers[self.grid_layer])
+        #     if ENABLE_SHADERS:
+        #         glDrawArrays(GL_QUADS, 0, 4)
+        #     else:
+        #         glBegin(GL_QUADS)
+        #         glTexCoord2f(0, 0)
+        #         glVertex2f(-1.0, -1.0)
+        #         glTexCoord2f(1, 0)
+        #         glVertex2f(1.0, -1.0)
+        #         glTexCoord2f(1, 1)
+        #         glVertex2f(1.0, 1.0)
+        #         glTexCoord2f(0, 1)
+        #         glVertex2f(-1.0, 1.0)
+        #         glEnd()
 
         if ENABLE_SHADERS:
             glUseProgram(self.shader.blur_program)
@@ -461,6 +458,7 @@ class Renderer:
 
         glLineWidth(1.0)
         glColor3f(1.0, 0.0, 0.0)
+        glDisable(GL_DEPTH_TEST)
         # Draw grid
         glBegin(GL_LINES)
         for i in range(1, width):
@@ -470,6 +468,7 @@ class Renderer:
             glVertex3f(x_dev, -3 * j, 0.32)
             glVertex3f(3 * width - x_dev, -3 * j, 0.32)
         glEnd()
+
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -494,12 +493,13 @@ class Renderer:
         glBindTexture(GL_TEXTURE_2D, 0)
         glDisable(GL_BLEND)
         glDisable(GL_TEXTURE_2D)
+        glEnable(GL_DEPTH_TEST)
 
     def _renderEdges(self):
         edges = self.alg.edges
 
         self._changeLayer(self.edges_layer)  # TODO fix hack
-        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, self.layers[self.edges_layer], 0)
+        # glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, self.layers[self.edges_layer], 0)
 
         self._resetCamera()
 
@@ -690,8 +690,13 @@ class Renderer:
         for i, entity in enumerate(entities + new_entity):
             if entity.i < 0 or entity.j < 0:  # not allowed
                 continue
-            if hasattr(entity, 'waiting') and entity.waiting:
-                continue  # do not draw if waiting
+            if entity.is_waiting or entity.is_home:
+                if self.entity_move_frame == self.entity_move_frames - 1:
+                    entity.in_home = True
+            else:
+                entity.in_home = False
+            if hasattr(entity, 'in_home') and entity.in_home:
+                continue  # do not draw if in home
 
             x, y, z = 3 * entity.i, -3 * entity.j, 0
             layer = self._determineLayer(LayerType.TILES, x, y, z)
